@@ -74,6 +74,7 @@ chat can draw, so Claude answers "show me" with an inline `html` block instead o
 | Key                      | Does                                                       |
 | ------------------------ | ---------------------------------------------------------- |
 | Enter                    | Send. While Claude works, the message is queued            |
+| Ctrl+Enter               | Send now, into Claude's running turn; or the first queued  |
 | Shift+Enter              | New line                                                   |
 | Esc                      | Stop Claude                                                |
 | `/`                      | Slash commands. `/new` starts a new chat, `/quit` closes   |

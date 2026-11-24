@@ -118,14 +118,15 @@ export function Composer() {
     return () => window.removeEventListener("keydown", focusInput);
   }, []);
 
-  function submit() {
+  /** Sends the input, or queues it while Claude works unless `now` sends it into the turn. */
+  function submit(now = false) {
     if (!canSend) return;
     const command = text.trim();
     if (command === "/new" || command === "/clear") actions.newSession();
     else if (command === "/quit" || command === "/exit") actions.quit();
     else if (command === "/patches") actions.setDrawing("patches");
     else if (command === "/tiles") actions.setDrawing("tiles");
-    else actions.send({ text: command, images });
+    else actions.send({ text: command, images }, { now });
     setText("");
     setImages([]);
   }
@@ -161,6 +162,13 @@ export function Composer() {
         setMenuDismissed(true);
         return;
       }
+    }
+    // Ctrl+Enter sends now, as in Claude Code: the input, or with an empty input the first queued.
+    if (event.key === "Enter" && event.ctrlKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      if (canSend) submit(true);
+      else if (queue.length > 0) actions.sendQueuedNow(0);
+      return;
     }
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
@@ -213,8 +221,8 @@ export function Composer() {
               <button
                 type="button"
                 className="icon-button"
-                title="Send now"
-                onClick={() => actions.sendNow(index)}
+                title="Send now (ctrl+enter)"
+                onClick={() => actions.sendQueuedNow(index)}
               >
                 <CornerDownLeft size={13} />
               </button>
@@ -300,9 +308,9 @@ export function Composer() {
             <button
               type="button"
               className="send"
-              title={running ? "Queue message" : "Send"}
+              title={running ? "Queue message (ctrl+enter sends now)" : "Send"}
               disabled={!canSend}
-              onClick={submit}
+              onClick={() => submit()}
             >
               <ArrowUp size={16} />
             </button>

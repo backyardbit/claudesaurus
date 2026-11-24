@@ -446,22 +446,27 @@ export function createStore(bridge: Bridge) {
     toastTimer = window.setTimeout(() => set({ ...state, toast: null }), 1800);
   }
 
+  /** Sends a message into the running turn, so Claude reads it before it carries on. */
+  function sendNow(draft: Draft) {
+    if (state.running) bridge.send({ type: "steer", text: draft.text, images: draft.images });
+    else sendDraft(draft);
+  }
+
   const actions = {
-    send(draft: Draft) {
+    /** Sends a message, or queues it while Claude works unless `now` sends it into the turn. */
+    send(draft: Draft, { now = false } = {}) {
       if (state.phase !== "ready") return;
-      if (state.running) set({ ...state, queue: [...state.queue, draft] });
-      else sendDraft(draft);
+      if (state.running && !now) set({ ...state, queue: [...state.queue, draft] });
+      else sendNow(draft);
     },
     unqueue(index: number) {
       set({ ...state, queue: state.queue.filter((_, position) => position !== index) });
     },
-    /** Sends a queued message into the running turn, so Claude reads it before it carries on. */
-    sendNow(index: number) {
+    sendQueuedNow(index: number) {
       const draft = state.queue[index];
       if (!draft) return;
       set({ ...state, queue: state.queue.filter((_, position) => position !== index) });
-      if (state.running) bridge.send({ type: "steer", text: draft.text, images: draft.images });
-      else sendDraft(draft);
+      sendNow(draft);
     },
     cancel() {
       if (state.running) bridge.send({ type: "cancel" });
