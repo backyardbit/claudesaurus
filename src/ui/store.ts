@@ -95,7 +95,7 @@ export type State = {
   pastSessions: PastSession[] | null;
   /** True while a past session's conversation is being replayed into the page. */
   replaying: boolean;
-  /** `/zen`: the conversation shows only what was said, without tool calls and thoughts. */
+  /** `/zen`: the conversation shows only what was said, without tool calls, thoughts or the plan. */
   zen: boolean;
   toast: string | null;
 };
@@ -508,7 +508,7 @@ export function createStore(bridge: Bridge) {
       const zen = !state.zen;
       set({ ...state, zen });
       bridge.send({ type: "setZen", zen });
-      showToast(zen ? "Zen: tool calls hidden" : "Showing tool calls");
+      showToast(zen ? "Zen: only the conversation" : "Zen off");
     },
     newSession() {
       if (state.running) bridge.send({ type: "cancel" });

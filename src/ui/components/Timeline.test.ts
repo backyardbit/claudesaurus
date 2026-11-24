@@ -29,6 +29,7 @@ const turn = [
     _meta: { claudeCode: { parentToolUseId: "agent" } },
   }),
   said("Found it.", "b"),
+  { type: "error", fatal: false, message: "Could not change model" },
   {
     type: "permissionRequest",
     requestId: "p",
@@ -42,11 +43,12 @@ const state = turn.reduce(
   initialState,
 );
 
-test("zen keeps what was said and drops tool calls and thoughts", () => {
+test("zen keeps what was said and errors, and drops tool calls and thoughts", () => {
   expect(zenItems(state.items).map((item) => item.kind)).toEqual([
     "user",
     "assistant",
     "assistant",
+    "error",
   ]);
 });
 
