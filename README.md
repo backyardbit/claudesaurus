@@ -91,8 +91,9 @@ chat can draw, so Claude answers "show me" with an inline `html` block instead o
 |                          | `/quit` closes. Enter runs the picked one, Tab fills it in |
 | `/resume`                | Pick a past chat from this directory; type to filter       |
 | `/patches`, `/tiles`     | Choose how frames are drawn (see Performance)              |
-| `/zen`                   | Hide tool calls and thoughts; again shows them. Kept for   |
-|                          | later runs. Permission prompts still show                  |
+| `/zen`                   | Show only the conversation: hide tool calls, thoughts,     |
+|                          | notices and the plan; again shows them. Kept for later     |
+|                          | runs. Errors and permission prompts still show             |
 | 1–9                      | Answer a permission prompt (with an empty input)           |
 | Ctrl+C                   | Copy the selection, else stop Claude, else clear the input |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Zoom                                                       |

@@ -129,7 +129,7 @@ export function App() {
             <ArrowDown size={13} /> Latest
           </button>
         )}
-        <PlanPill plan={plan} />
+        {!zen && <PlanPill plan={plan} />}
         <Composer />
       </div>
       {toast && <div className="toast">{toast}</div>}

@@ -110,11 +110,14 @@ function toolCallIds(items: Item[], found = new Set<string>()) {
 }
 
 /**
- * What `/zen` shows: the messages and notices, without tool calls (a subagent's work included)
- * or thoughts. Text on either side of a hidden call reads on as the next paragraph.
+ * What `/zen` shows: only what was said, and errors. Tool calls (a subagent's work included),
+ * thoughts and notices are hidden. Text on either side of a hidden call reads on as the next
+ * paragraph.
  */
 export function zenItems(items: Item[]) {
-  return items.filter((item) => item.kind !== "tool" && item.kind !== "thought");
+  return items.filter(
+    (item) => item.kind === "user" || item.kind === "assistant" || item.kind === "error",
+  );
 }
 
 /** Permission requests with no tool card among `items` to sit under, shown after them. */
