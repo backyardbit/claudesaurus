@@ -239,7 +239,11 @@ export function ToolCall({ tool, renderChildren }: ToolCallProps) {
       <>
         {command && (
           <div className="card command">
-            <pre>{command}</pre>
+            <pre>
+              {Array.from(command.matchAll(/\S+|\s+/g), (match) =>
+                /\s/.test(match[0]) ? match[0] : <span key={match.index}>{match[0]}</span>,
+              )}
+            </pre>
             <CopyButton text={command} />
           </div>
         )}

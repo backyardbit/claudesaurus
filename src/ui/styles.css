@@ -530,15 +530,28 @@ kbd {
   color: var(--red);
 }
 
+.card.command {
+  display: flex;
+}
+
 .card.command pre {
-  padding-right: 2.6rem;
+  flex: 1;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   color: var(--blue);
 }
 
+/* Each word of the command is one box, so lines break at spaces, not after a hyphen
+   inside `--flag` or `file-name`; a word wider than the card still wraps inside. */
+.card.command pre span {
+  display: inline-block;
+  max-width: 100%;
+}
+
 .card.command .icon-button {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
+  margin: 0.35rem;
 }
 
 .more {
