@@ -194,6 +194,10 @@ view.webContents.ipc.on(UI_CHANNEL, (_event, message: UiMessage) => {
       emit({ type: "userMessage", text: message.text, images: message.images });
       void agent.prompt(message.text, message.images);
       break;
+    case "steer":
+      emit({ type: "userMessage", text: message.text, images: message.images });
+      void agent.steer(message.text, message.images);
+      break;
     case "cancel":
       void agent.cancel();
       break;

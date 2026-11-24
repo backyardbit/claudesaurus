@@ -351,7 +351,8 @@ export function reduce(state: State, message: MainMessage, now: number): State {
       return {
         ...state,
         running: true,
-        turnStartedAt: now,
+        // A message sent into a running turn continues it, so the turn keeps its start.
+        turnStartedAt: state.running ? state.turnStartedAt : now,
         items: [
           ...closeThoughts(state.items, now),
           {
@@ -453,6 +454,14 @@ export function createStore(bridge: Bridge) {
     },
     unqueue(index: number) {
       set({ ...state, queue: state.queue.filter((_, position) => position !== index) });
+    },
+    /** Sends a queued message into the running turn, so Claude reads it before it carries on. */
+    sendNow(index: number) {
+      const draft = state.queue[index];
+      if (!draft) return;
+      set({ ...state, queue: state.queue.filter((_, position) => position !== index) });
+      if (state.running) bridge.send({ type: "steer", text: draft.text, images: draft.images });
+      else sendDraft(draft);
     },
     cancel() {
       if (state.running) bridge.send({ type: "cancel" });
