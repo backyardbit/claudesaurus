@@ -915,6 +915,40 @@ kbd {
   max-width: 100%;
 }
 
+.video {
+  display: block;
+  max-width: 100%;
+  max-height: 28rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: black;
+}
+
+.video-problem {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.video-problem > span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.video-problem-icon {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--yellow);
+}
+
+.video-problem-title {
+  font-weight: 600;
+}
+
 .markdown input[type="checkbox"] {
   margin-right: 0.4rem;
 }

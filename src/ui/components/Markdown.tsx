@@ -8,7 +8,7 @@ import {
   type ReactNode,
   useContext,
 } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
@@ -17,16 +17,27 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { normalizeMath } from "../math";
 import { useActions } from "../store";
+import { isVideo } from "../video";
 import { CodeBlock } from "./CodeBlock";
+import { Video } from "./Video";
 
-/** The default schema, plus the classes remark-math uses to hand formulas to KaTeX. */
+/**
+ * The default schema, plus the classes remark-math uses to hand formulas to KaTeX, and images
+ * from `file:` addresses, since a reply shows a local video with one.
+ */
 const sanitizeSchema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
     code: [["className", /^language-./, "math-inline", "math-display"]],
   },
+  protocols: { ...defaultSchema.protocols, src: [...(defaultSchema.protocols?.src ?? []), "file"] },
 };
+
+/** Keeps a `file:` image address, which react-markdown's own check would drop. */
+function urlTransform(url: string, key: string) {
+  return key === "src" && /^file:\/\//i.test(url) ? url : defaultUrlTransform(url);
+}
 
 const StreamingContext = createContext(false);
 
@@ -79,7 +90,13 @@ function Anchor({ href, children }: ComponentProps<"a">) {
   );
 }
 
-const components = { pre: Pre, a: Anchor };
+/** An image, or a video when the address names one: `![demo](/tmp/demo.webm)`. */
+function Image({ src, alt, title }: ComponentProps<"img">) {
+  if (src !== undefined && isVideo(src)) return <Video src={src} title={title ?? alt ?? ""} />;
+  return <img src={src} alt={alt} title={title} />;
+}
+
+const components = { pre: Pre, a: Anchor, img: Image };
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins: ComponentProps<typeof ReactMarkdown>["rehypePlugins"] = [
   rehypeRaw,
@@ -98,6 +115,7 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: Mark
           remarkPlugins={remarkPlugins}
           rehypePlugins={rehypePlugins}
           components={components}
+          urlTransform={urlTransform}
         >
           {normalizeMath(text)}
         </ReactMarkdown>

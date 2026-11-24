@@ -81,6 +81,11 @@ start whichever install ran last, a Homebrew one or a source checkout.
 Every session adds a note to Claude's system prompt (`src/main/systemPrompt.ts`) saying what the
 chat can draw, so Claude answers "show me" with an inline `html` block instead of writing a file.
 
+A Markdown image of a video file, `![demo](/abs/path/demo.mp4)`, is shown as a player, so Claude
+can show you a recording it made. It plays MP4 and MOV (H.264, HEVC, AV1) and WebM (VP8, VP9,
+AV1), never starts by itself, and pauses when scrolled out of view, since every frame it plays is
+drawn again in the terminal.
+
 | Key                      | Does                                                       |
 | ------------------------ | ---------------------------------------------------------- |
 | Enter                    | Send. While Claude works, the message is queued            |
