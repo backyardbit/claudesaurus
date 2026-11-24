@@ -38,6 +38,11 @@ brew tap backyardbit/tap
 brew install backyardbit/tap/claudesaurus
 ```
 
+Homebrew installs only the built app. The first run downloads the app's runtime, PixelGUI's
+Electron and Claude Code, into `~/.local/share/claudesaurus`, which takes about a minute;
+`claudesaurus --setup` does it ahead of time. They are signed programs that Homebrew would rewrite
+and re-sign, which breaks Electron on macOS. Uninstalling leaves that folder behind.
+
 From source, with Node 22 or newer and pnpm:
 
 ```sh
@@ -165,11 +170,15 @@ To look inside a pane that is already running, use its Chromium debugging port: 
 
 ## Release
 
-`pnpm package` builds `release/claudesaurus-VERSION.tar.gz`: the built app with the lockfile and
-patches, which the Homebrew formula unpacks and finishes with `pnpm install --prod`. To release,
-set the version in `package.json`, tag it, attach the archive to a GitHub release, and update the
-URL and checksum in `Formula/claudesaurus.rb` in
+`pnpm package` builds, in `release/`, the archive `claudesaurus-VERSION.tar.gz` (the built app
+with the lockfile and patches) and the Homebrew formula for it, `claudesaurus.rb`, from
+`packaging/claudesaurus.rb`. To release, set the version in `package.json`, tag it, attach the
+archive to a GitHub release, and copy the formula to `Formula/` in
 [backyardbit/homebrew-tap](https://github.com/backyardbit/homebrew-tap).
+
+The Package workflow installs the formula with Homebrew on macOS and Linux and runs
+`scripts/smoke.sh`, which starts the installed app on a recorded conversation and keeps a
+screenshot of the page. Run it with the `tap` input to check the released formula too.
 
 ## Not built yet
 
