@@ -21,7 +21,13 @@ import type {
   PromptImage,
   SessionInfo,
 } from "../shared/protocol";
-import { claudeCodeMeta } from "./meta";
+import {
+  ClaudeCodeMetaSchema,
+  type ToolInput,
+  ToolInputSchema,
+  ToolOutputSchema,
+  type ToolResponse,
+} from "./meta";
 
 export type ToolState = {
   toolCallId: string;
@@ -31,9 +37,11 @@ export type ToolState = {
   status: ToolCallStatus;
   content: ToolCallContent[];
   locations: ToolCallLocation[];
+  /** The input as Claude sent it, shown as JSON for tools the page knows nothing about. */
   rawInput: unknown;
-  rawOutput: unknown;
-  toolResponse: unknown;
+  input: ToolInput;
+  output: string | null;
+  response: ToolResponse | null;
   startedAt: number;
   endedAt: number | null;
   /** False for a call replayed from a past session, whose real times are not known. */
@@ -180,8 +188,9 @@ function isSettled(status: ToolCallStatus) {
 }
 
 function mergeTool(tool: ToolState, update: ToolCallUpdate, now: number): ToolState {
-  const meta = claudeCodeMeta(update._meta);
+  const meta = ClaudeCodeMetaSchema.parse(update._meta);
   const status = update.status ?? tool.status;
+  const rawInput = update.rawInput ?? tool.rawInput;
   return {
     ...tool,
     title: update.title ?? tool.title,
@@ -190,9 +199,10 @@ function mergeTool(tool: ToolState, update: ToolCallUpdate, now: number): ToolSt
     status,
     content: update.content ?? tool.content,
     locations: update.locations ?? tool.locations,
-    rawInput: update.rawInput ?? tool.rawInput,
-    rawOutput: update.rawOutput ?? tool.rawOutput,
-    toolResponse: meta.toolResponse ?? tool.toolResponse,
+    rawInput,
+    input: ToolInputSchema.parse(rawInput),
+    output: update.rawOutput == null ? tool.output : ToolOutputSchema.parse(update.rawOutput),
+    response: meta.toolResponse ?? tool.response,
     endedAt: tool.endedAt ?? (isSettled(status) ? now : null),
   };
 }
@@ -207,8 +217,9 @@ function newTool(update: ToolCallUpdate, { now, timed }: Moment): ToolState {
     content: [],
     locations: [],
     rawInput: undefined,
-    rawOutput: undefined,
-    toolResponse: undefined,
+    input: {},
+    output: null,
+    response: null,
     startedAt: now,
     endedAt: null,
     timed,
@@ -277,7 +288,7 @@ function applyToList(items: Item[], update: SessionUpdate, moment: Moment): Item
 }
 
 function applyItems(items: Item[], update: SessionUpdate, moment: Moment): Item[] {
-  const parent = claudeCodeMeta(update._meta).parentToolUseId;
+  const parent = ClaudeCodeMetaSchema.parse(update._meta).parentToolUseId;
   if (parent) {
     const nested = mapTool(items, parent, (tool) => ({
       ...tool,

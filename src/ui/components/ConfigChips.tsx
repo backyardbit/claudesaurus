@@ -30,10 +30,17 @@ function currentName(option: SessionConfigOption) {
   return current?.name ?? option.currentValue;
 }
 
-const CHIP_ICONS: Record<string, LucideIcon> = {
-  model: Sparkle,
-  mode: Shield,
-};
+/** The icon on a setting's chip, by its ACP category. */
+function chipIcon(category: SessionConfigOption["category"]): LucideIcon | undefined {
+  switch (category) {
+    case "model":
+      return Sparkle;
+    case "mode":
+      return Shield;
+    default:
+      return undefined;
+  }
+}
 
 /** The options that get their own chip, by ACP category, in display order. */
 const PRIMARY_CATEGORIES = ["model", "thought_level", "mode"];
@@ -41,7 +48,7 @@ const PRIMARY_CATEGORIES = ["model", "thought_level", "mode"];
 function SelectChip({ option }: { option: SessionConfigOption }) {
   const actions = useActions();
   const [open, setOpen] = useState(false);
-  const Icon = CHIP_ICONS[option.category ?? ""];
+  const Icon = chipIcon(option.category);
   return (
     <Popover
       open={open}

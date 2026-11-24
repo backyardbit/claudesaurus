@@ -1,5 +1,13 @@
 import type { Element } from "hast";
-import { type ComponentProps, createContext, memo, type ReactNode, useContext } from "react";
+import {
+  Children,
+  type ComponentProps,
+  createContext,
+  isValidElement,
+  memo,
+  type ReactNode,
+  useContext,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
@@ -23,12 +31,13 @@ const sanitizeSchema = {
 const StreamingContext = createContext(false);
 
 function textOf(node: ReactNode): string {
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(textOf).join("");
-  if (typeof node === "object" && node !== null && "props" in node) {
-    return textOf((node.props as { children?: ReactNode }).children);
-  }
-  return "";
+  return Children.toArray(node)
+    .map((child) =>
+      isValidElement<{ children?: ReactNode }>(child)
+        ? textOf(child.props.children)
+        : String(child),
+    )
+    .join("");
 }
 
 function codeLanguage(node: Element | undefined) {
@@ -37,9 +46,7 @@ function codeLanguage(node: Element | undefined) {
   );
   const classes = code?.properties.className;
   if (!Array.isArray(classes)) return null;
-  const language = classes.find(
-    (name): name is string => typeof name === "string" && name.startsWith("language-"),
-  );
+  const language = classes.map(String).find((name) => name.startsWith("language-"));
   return language ? language.slice("language-".length) : null;
 }
 

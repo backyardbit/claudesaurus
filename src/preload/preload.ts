@@ -1,5 +1,5 @@
 import type {} from "@zenbu-labs/pixel/preload";
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, type IpcRendererEvent, ipcRenderer } from "electron";
 import { type Bridge, MAIN_CHANNEL, type MainMessage, UI_CHANNEL } from "../shared/protocol";
 
 const bridge: Bridge = {
@@ -7,7 +7,7 @@ const bridge: Bridge = {
     ipcRenderer.send(UI_CHANNEL, message);
   },
   subscribe(listener) {
-    const handler = (_event: unknown, message: MainMessage) => listener(message);
+    const handler = (_event: IpcRendererEvent, message: MainMessage) => listener(message);
     ipcRenderer.on(MAIN_CHANNEL, handler);
     return () => ipcRenderer.removeListener(MAIN_CHANNEL, handler);
   },

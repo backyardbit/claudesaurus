@@ -1,10 +1,17 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { z } from "zod";
 
 export type ContextUsage = { used: number; size: number };
 
-type Stored = Record<string, ContextUsage & { updatedAt: number }>;
+/** How full each session's context was, by session id, and when that was noted. */
+const StoredSchema = z.record(
+  z.string(),
+  z.object({ used: z.number(), size: z.number(), updatedAt: z.number() }),
+);
+
+type Stored = z.infer<typeof StoredSchema>;
 
 const MAX_SESSIONS = 200;
 const SAVE_DELAY_MS = 1000;
@@ -16,7 +23,7 @@ function defaultFile() {
 
 function read(file: string): Stored {
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8")) as Stored;
+    return StoredSchema.parse(JSON.parse(fs.readFileSync(file, "utf8")));
   } catch {
     return {};
   }

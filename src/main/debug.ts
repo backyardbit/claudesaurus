@@ -26,7 +26,7 @@ export function startDebugCapture(directory: string, contents: WebContents) {
 
   return {
     /** Notes a fact about the run, such as the pane's size. */
-    note(label: string, value: unknown) {
+    note<Fact>(label: string, value: Fact) {
       fs.appendFileSync(
         path.join(directory, "notes.jsonl"),
         `${JSON.stringify({ [label]: value })}\n`,

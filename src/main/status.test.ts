@@ -14,9 +14,14 @@ const TERMINATOR = "\x1b\\";
 function decode(sequence: string) {
   if (!sequence.startsWith(PREFIX) || !sequence.endsWith(TERMINATOR)) return { other: sequence };
   const body = sequence.slice(PREFIX.length, -TERMINATOR.length);
-  const pairs = Object.fromEntries(body.split(":").map((pair) => pair.split(/=(.*)/s)));
+  const pairs = Object.fromEntries(
+    body.split(":").map((pair): [string, string] => {
+      const [key = "", value = ""] = pair.split(/=(.*)/s);
+      return [key, value];
+    }),
+  );
   if (pairs.msg) pairs.msg = Buffer.from(pairs.msg, "base64").toString("utf8");
-  return pairs as Record<string, string>;
+  return pairs;
 }
 
 function reporter() {

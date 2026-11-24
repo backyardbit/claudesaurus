@@ -11,6 +11,7 @@ import {
   type SessionConfigOption,
   type SystemPrompt,
 } from "@agentclientprotocol/sdk";
+import { z } from "zod";
 import type { MainMessage, PastSession, PromptImage } from "../shared/protocol";
 
 export type AgentOptions = {
@@ -32,9 +33,18 @@ export type AgentOptions = {
 
 export type ResumeTarget = { kind: "session"; sessionId: string } | { kind: "latest" };
 
-type AuthStatusParams = {
-  accounts?: { label?: string; email?: string; active?: boolean }[];
-};
+/** The adapter's `auth/status_update` notification: the accounts it can use. */
+const AuthStatusSchema = z.object({
+  accounts: z
+    .array(
+      z.object({
+        label: z.string().optional(),
+        email: z.string().optional(),
+        active: z.boolean().optional(),
+      }),
+    )
+    .optional(),
+});
 
 const STDERR_TAIL_BYTES = 4000;
 
@@ -43,13 +53,11 @@ const STEER_METHOD = "_session/steering";
 
 type SteerResponse = { outcome: "injected" | "promptRequired" | "startedNewTurn" };
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "object" && error !== null && "message" in error) {
-    return String(error.message);
-  }
-  return String(error);
-}
+/** What a failed request threw, as text: its message when it has one. */
+const ErrorMessageSchema = z.union([
+  z.object({ message: z.string() }).transform(({ message }) => message),
+  z.unknown().transform(String),
+]);
 
 export function createAgent(options: AgentOptions) {
   const { emit } = options;
@@ -121,7 +129,8 @@ export function createAgent(options: AgentOptions) {
       })
       .onNotification("*", ({ method, params }) => {
         if (method !== "auth/status_update") return;
-        const accounts = (params as AuthStatusParams).accounts ?? [];
+        const status = AuthStatusSchema.safeParse(params);
+        const accounts = (status.success && status.data.accounts) || [];
         const account = accounts.find((candidate) => candidate.active) ?? accounts[0];
         if (!account) return;
         emit({
@@ -132,6 +141,8 @@ export function createAgent(options: AgentOptions) {
 
     const stream = ndJsonStream(
       Writable.toWeb(spawned.stdin),
+      // SAFETY: stdout has no encoding set, so the stream it becomes yields Buffers, which are
+      // Uint8Arrays; Node types the web stream's chunks as `any`.
       Readable.toWeb(spawned.stdout) as ReadableStream<Uint8Array>,
     );
     connection = app.connect(stream);
@@ -234,7 +245,7 @@ export function createAgent(options: AgentOptions) {
       emit({
         type: "error",
         fatal: true,
-        message: `Could not start a Claude session: ${errorMessage(error)}`,
+        message: `Could not start a Claude session: ${ErrorMessageSchema.parse(error)}`,
       });
     }
   }
@@ -254,7 +265,7 @@ export function createAgent(options: AgentOptions) {
       });
       emit({ type: "turnEnded", stopReason: response.stopReason });
     } catch (error) {
-      emit({ type: "error", fatal: false, message: errorMessage(error) });
+      emit({ type: "error", fatal: false, message: ErrorMessageSchema.parse(error) });
       emit({ type: "turnEnded", stopReason: "error" });
     }
   }
@@ -273,7 +284,7 @@ export function createAgent(options: AgentOptions) {
       });
       if (response.outcome === "promptRequired") await prompt(text, images);
     } catch (error) {
-      emit({ type: "error", fatal: false, message: errorMessage(error) });
+      emit({ type: "error", fatal: false, message: ErrorMessageSchema.parse(error) });
     }
   }
 
@@ -298,7 +309,7 @@ export function createAgent(options: AgentOptions) {
     try {
       const response = await connection.agent.request(
         methods.agent.session.setConfigOption,
-        typeof value === "boolean"
+        value === true || value === false
           ? { sessionId, configId, type: "boolean", value }
           : { sessionId, configId, value },
       );
@@ -307,7 +318,7 @@ export function createAgent(options: AgentOptions) {
       emit({
         type: "error",
         fatal: false,
-        message: `Could not change ${configId}: ${errorMessage(error)}`,
+        message: `Could not change ${configId}: ${ErrorMessageSchema.parse(error)}`,
       });
     }
   }
@@ -321,7 +332,7 @@ export function createAgent(options: AgentOptions) {
       emit({
         type: "error",
         fatal: false,
-        message: `Could not start a new session: ${errorMessage(error)}`,
+        message: `Could not start a new session: ${ErrorMessageSchema.parse(error)}`,
       });
     }
   }
@@ -335,7 +346,7 @@ export function createAgent(options: AgentOptions) {
       emit({
         type: "error",
         fatal: false,
-        message: `Could not list sessions: ${errorMessage(error)}`,
+        message: `Could not list sessions: ${ErrorMessageSchema.parse(error)}`,
       });
     }
   }
@@ -349,7 +360,7 @@ export function createAgent(options: AgentOptions) {
       emit({
         type: "error",
         fatal: false,
-        message: `Could not open session ${id}: ${errorMessage(error)}`,
+        message: `Could not open session ${id}: ${ErrorMessageSchema.parse(error)}`,
       });
     }
   }

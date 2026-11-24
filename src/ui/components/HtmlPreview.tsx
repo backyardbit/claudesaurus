@@ -1,4 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { z } from "zod";
+
+/** What a preview's own script posts: its frame's id and the height of its content. */
+const FrameSizeSchema = z.object({ claudesaurusFrame: z.string(), height: z.number() });
 
 const MAX_HEIGHT = 640;
 const MIN_HEIGHT = 48;
@@ -25,11 +29,9 @@ export function HtmlPreview({ html }: { html: string }) {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow) return;
-      const data: unknown = event.data;
-      if (typeof data !== "object" || data === null) return;
-      if (!("claudesaurusFrame" in data) || data.claudesaurusFrame !== frameId) return;
-      if (!("height" in data) || typeof data.height !== "number") return;
-      setHeight(Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, Math.ceil(data.height))));
+      const size = FrameSizeSchema.safeParse(event.data);
+      if (!size.success || size.data.claudesaurusFrame !== frameId) return;
+      setHeight(Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, Math.ceil(size.data.height))));
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
