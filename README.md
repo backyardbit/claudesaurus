@@ -116,10 +116,12 @@ desktop notification (OSC 777). `rex block call -b BLOCK program_status` shows t
 ## Performance
 
 Every change on the page is drawn again in the terminal, and with Rex each frame travels from this
-machine to the Rex app. So the page avoids changes that are not needed: it has no animations,
-and shows streamed text in steps of 80 ms. During a turn the view follows the newest line, which
-drew about a quarter more than moving it a page at a time, measured as rows drawn per word of a
-reply; the page jumps left most of the pane empty below the newest line.
+machine to the Rex app. So the page avoids changes that are not needed: its one animation is the
+dinosaur that walks while Claude works, at four frames a second (about 4,000 more rows drawn a
+second than the still dot it replaced, and nothing between turns), and it shows streamed text in
+steps of 80 ms. During a turn the view follows the newest line, which drew about a quarter more
+than moving it a page at a time, measured as rows drawn per word of a reply; the page jumps left
+most of the pane empty below the newest line.
 
 Scrolling is cheap only when PixelGUI can move the picture already in the terminal and send just
 the strip that came into view. Three things make that work:

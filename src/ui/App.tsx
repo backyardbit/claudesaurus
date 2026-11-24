@@ -3,7 +3,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Composer } from "./components/Composer";
 import { PlanPill } from "./components/PlanPill";
 import { Timeline } from "./components/Timeline";
-import { formatDuration, shortPath } from "./format";
+import { Working } from "./components/Working";
+import { shortPath } from "./format";
 import { useAppState } from "./store";
 
 /** Room kept under the newest content when the view moves to show it, in pixels. */
@@ -11,21 +12,6 @@ const FOLLOW_MARGIN = 24;
 
 /** Room kept above a message that was just sent, in pixels. */
 const SENT_MARGIN = 16;
-
-function Working({ since }: { since: number }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  const seconds = Math.max(0, Math.floor((now - since) / 1000));
-  return (
-    <div className="working">
-      <span className="working-dot" aria-hidden="true" />
-      Working <span className="dim">{formatDuration(seconds * 1000)} · esc to stop</span>
-    </div>
-  );
-}
 
 function Welcome() {
   const session = useAppState((state) => state.session);
