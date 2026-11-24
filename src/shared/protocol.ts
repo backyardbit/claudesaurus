@@ -42,6 +42,7 @@ export type UiMessage =
   | { type: "listSessions" }
   | { type: "resume"; sessionId: string }
   | { type: "setDrawing"; drawing: Drawing }
+  | { type: "setZen"; zen: boolean }
   | { type: "copy"; text: string }
   | { type: "openLink"; url: string }
   | { type: "quit" };
@@ -52,6 +53,8 @@ export type MainMessage =
   | { type: "session"; session: SessionInfo }
   | { type: "account"; account: AccountInfo }
   | { type: "historyLoaded" }
+  /** Whether `/zen` is on, as saved. Sent first whenever the page loads. */
+  | { type: "zen"; zen: boolean }
   /** The answer to `listSessions`, newest first. */
   | { type: "sessions"; sessions: PastSession[] }
   | { type: "configOptions"; configOptions: SessionConfigOption[] }

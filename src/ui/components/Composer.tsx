@@ -1,5 +1,5 @@
 import type { AvailableCommand } from "@agentclientprotocol/sdk";
-import { ArrowUp, CornerDownLeft, Folder, Square, X } from "lucide-react";
+import { ArrowUp, CornerDownLeft, Folder, Leaf, Square, X } from "lucide-react";
 import {
   type ClipboardEvent,
   type KeyboardEvent,
@@ -25,6 +25,7 @@ const LOCAL_COMMANDS: AvailableCommand[] = [
   { name: "resume", description: "Open a past chat from this folder" },
   { name: "patches", description: "Draw only the areas that change: much less data to send" },
   { name: "tiles", description: "Draw in tiles, PixelGUI's usual way in Rex" },
+  { name: "zen", description: "Hide tool calls and thoughts, or show them again" },
   { name: "quit", description: "Close Claudesaurus" },
 ];
 
@@ -103,6 +104,7 @@ export function Composer() {
   const queue = useAppState((state) => state.queue);
   const pastSessions = useAppState((state) => state.pastSessions);
   const pendingPermission = useAppState((state) => state.permissions[0] ?? null);
+  const zen = useAppState((state) => state.zen);
 
   const [text, setText] = useState("");
   const [images, setImages] = useState<PromptImage[]>([]);
@@ -219,6 +221,7 @@ export function Composer() {
     else if (command === "/quit" || command === "/exit") actions.quit();
     else if (command === "/patches") actions.setDrawing("patches");
     else if (command === "/tiles") actions.setDrawing("tiles");
+    else if (command === "/zen") actions.toggleZen();
     else actions.send({ text: command, images }, { now });
     setText("");
     setImages([]);
@@ -400,6 +403,16 @@ export function Composer() {
         />
         <div className="composer-bar">
           <ConfigChips options={configOptions} />
+          {zen && (
+            <button
+              type="button"
+              className="chip zen-chip"
+              title="Tool calls and thoughts are hidden. Click or type /zen to show them"
+              onClick={actions.toggleZen}
+            >
+              <Leaf size={13} /> Zen
+            </button>
+          )}
           {session && (
             <span className="plain-chip" title={session.cwd}>
               <Folder size={13} /> {shortPath(session.cwd)}

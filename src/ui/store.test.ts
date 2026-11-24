@@ -190,3 +190,8 @@ test("tracks pending permission requests", () => {
   expect(asked.permissions).toHaveLength(1);
   expect(play([{ type: "permissionClosed", requestId: "p" }], asked).permissions).toHaveLength(0);
 });
+
+test("zen mode outlasts a new session", () => {
+  const state = play([{ type: "zen", zen: true }, session(false)]);
+  expect(state.zen).toBe(true);
+});

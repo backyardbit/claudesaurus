@@ -39,6 +39,7 @@ export function App() {
   const turnStartedAt = useAppState((state) => state.turnStartedAt);
   const plan = useAppState((state) => state.plan);
   const toast = useAppState((state) => state.toast);
+  const zen = useAppState((state) => state.zen);
 
   const scroller = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
@@ -98,7 +99,7 @@ export function App() {
       <div className="scroller" ref={scroller} onScroll={onScroll}>
         <div className={running && items.length > 0 ? "column reserve" : "column"} ref={column}>
           {items.length === 0 && phase !== "failed" && <Welcome />}
-          <Timeline items={items} permissions={permissions} running={running} />
+          <Timeline items={items} permissions={permissions} running={running} zen={zen} />
           {running && turnStartedAt !== null && <Working since={turnStartedAt} />}
           {phase === "failed" && (
             <div className="notice error fatal">

@@ -240,6 +240,7 @@ view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
   switch (message.type) {
     case "ready":
       pageReady = true;
+      view.webContents.send(MAIN_CHANNEL, { type: "zen", zen: settings.zen } satisfies MainMessage);
       for (const earlier of history) view.webContents.send(MAIN_CHANNEL, earlier);
       break;
     case "prompt":
@@ -272,6 +273,10 @@ view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
       settings.drawing = message.drawing;
       saveSettings(settings);
       applyDrawing();
+      break;
+    case "setZen":
+      settings.zen = message.zen;
+      saveSettings(settings);
       break;
     case "copy":
       root.setClipboard(message.text);
