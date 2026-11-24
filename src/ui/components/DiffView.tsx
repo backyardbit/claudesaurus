@@ -1,5 +1,6 @@
 import { diffLines } from "diff";
 import { useMemo, useState } from "react";
+import type { PatchHunk, ToolResponse } from "../meta";
 
 export type DiffRow = {
   type: "add" | "remove" | "context";
@@ -8,25 +9,10 @@ export type DiffRow = {
   text: string;
 };
 
-type PatchHunk = { oldStart: number; newStart: number; lines: string[] };
-
-function isHunk(value: unknown): value is PatchHunk {
-  if (typeof value !== "object" || value === null) return false;
-  const hunk = value as Record<string, unknown>;
-  return (
-    typeof hunk.oldStart === "number" &&
-    typeof hunk.newStart === "number" &&
-    Array.isArray(hunk.lines) &&
-    hunk.lines.every((line) => typeof line === "string")
-  );
-}
-
-/** Reads the unified hunks Claude Code reports for a finished edit, which carry real line numbers. */
-export function patchHunks(toolResponse: unknown) {
-  if (typeof toolResponse !== "object" || toolResponse === null) return null;
-  const patch = (toolResponse as Record<string, unknown>).structuredPatch;
-  if (!Array.isArray(patch) || patch.length === 0 || !patch.every(isHunk)) return null;
-  return patch;
+/** The unified hunks Claude Code reports for a finished edit, which carry real line numbers. */
+export function patchHunks(response: ToolResponse | null) {
+  const patch = response?.structuredPatch;
+  return patch && patch.length > 0 ? patch : null;
 }
 
 export function rowsFromHunks(hunks: PatchHunk[]) {

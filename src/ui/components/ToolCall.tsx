@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { basename, formatDuration } from "../format";
-import { numberField, stringField } from "../meta";
+import type { ToolInput, ToolResponse } from "../meta";
 import type { Item, ToolState } from "../store";
 import { CopyButton } from "./CodeBlock";
 import {
@@ -38,8 +38,8 @@ type Summary = {
 };
 
 function summarize(tool: ToolState): Summary {
-  const input = tool.rawInput;
-  const file = stringField(input, "file_path") ?? stringField(input, "notebook_path");
+  const { input } = tool;
+  const file = input.file_path ?? input.notebook_path;
   switch (tool.toolName) {
     case "Read":
       return { icon: FileText, label: "Read", detail: file ? basename(file) : "", mono: true };
@@ -50,8 +50,8 @@ function summarize(tool: ToolState): Summary {
     case "NotebookEdit":
       return { icon: Pencil, label: "Edit", detail: file ? basename(file) : "", mono: true };
     case "Bash": {
-      const description = stringField(input, "description");
-      const command = stringField(input, "command") ?? "";
+      const description = input.description;
+      const command = input.command ?? "";
       return {
         icon: SquareTerminal,
         label: "Bash",
@@ -63,42 +63,40 @@ function summarize(tool: ToolState): Summary {
       return {
         icon: Search,
         label: "Search",
-        detail: `“${stringField(input, "pattern") ?? ""}”`,
+        detail: `“${input.pattern ?? ""}”`,
         mono: true,
       };
     case "Glob":
       return {
         icon: Search,
         label: "Find",
-        detail: stringField(input, "pattern") ?? "",
+        detail: input.pattern ?? "",
         mono: true,
       };
     case "WebFetch":
-      return { icon: Globe, label: "Fetch", detail: stringField(input, "url") ?? "", mono: true };
+      return { icon: Globe, label: "Fetch", detail: input.url ?? "", mono: true };
     case "WebSearch":
-      return { icon: Globe, label: "Web search", detail: stringField(input, "query") ?? "" };
+      return { icon: Globe, label: "Web search", detail: input.query ?? "" };
     case "Task":
     case "Agent":
       return {
         icon: Bot,
         label: "Agent",
-        detail: stringField(input, "description") ?? tool.title,
-        badge: stringField(input, "subagent_type"),
+        detail: input.description ?? tool.title,
+        badge: input.subagent_type,
       };
     case "TodoWrite":
       return { icon: ListTodo, label: "Todo", detail: todoProgress(input) };
     case "Skill":
-      return { icon: Sparkles, label: "Skill", detail: stringField(input, "skill") ?? tool.title };
+      return { icon: Sparkles, label: "Skill", detail: input.skill ?? tool.title };
     default:
       return { icon: Wrench, label: tool.toolName ?? "Tool", detail: tool.title };
   }
 }
 
-function todoProgress(input: unknown) {
-  if (typeof input !== "object" || input === null || !("todos" in input)) return "";
-  const { todos } = input;
-  if (!Array.isArray(todos)) return "";
-  const done = todos.filter((todo: unknown) => stringField(todo, "status") === "completed").length;
+function todoProgress({ todos }: ToolInput) {
+  if (!todos) return "";
+  const done = todos.filter((todo) => todo.status === "completed").length;
   return `${done}/${todos.length}`;
 }
 
@@ -117,18 +115,18 @@ function stripFence(text: string) {
 }
 
 function bashOutput(tool: ToolState) {
-  const stdout = stringField(tool.toolResponse, "stdout");
-  const stderr = stringField(tool.toolResponse, "stderr");
+  const stdout = tool.response?.stdout;
+  const stderr = tool.response?.stderr;
   if (stdout !== undefined || stderr !== undefined) {
     return { stdout: stdout ?? "", stderr: stderr ?? "" };
   }
   if (tool.status === "pending" || tool.status === "in_progress") return { stdout: "", stderr: "" };
-  const text = typeof tool.rawOutput === "string" ? tool.rawOutput : stripFence(contentText(tool));
+  const text = tool.output ?? stripFence(contentText(tool));
   return tool.status === "failed" ? { stdout: "", stderr: text } : { stdout: text, stderr: "" };
 }
 
-function diffRows(toolResponse: unknown, content: ToolState["content"]) {
-  const hunks = patchHunks(toolResponse);
+function diffRows(response: ToolResponse | null, content: ToolState["content"]) {
+  const hunks = patchHunks(response);
   if (hunks) return rowsFromHunks(hunks);
   const rows: DiffRow[] = [];
   for (const entry of content) {
@@ -140,15 +138,15 @@ function diffRows(toolResponse: unknown, content: ToolState["content"]) {
 /** A whole HTML or SVG file that Claude just wrote, which can be shown live. */
 function writtenPage(tool: ToolState) {
   if (tool.toolName !== "Write") return null;
-  const file = stringField(tool.rawInput, "file_path") ?? "";
+  const file = tool.input.file_path ?? "";
   if (!/\.(html?|svg)$/i.test(file)) return null;
-  return stringField(tool.rawInput, "content") ?? null;
+  return tool.input.content ?? null;
 }
 
 function resultCount(tool: ToolState) {
-  const files = numberField(tool.toolResponse, "numFiles");
+  const files = tool.response?.numFiles;
   if (files !== undefined) return `${files} ${files === 1 ? "file" : "files"}`;
-  const lines = numberField(tool.toolResponse, "numLines");
+  const lines = tool.response?.numLines;
   if (lines !== undefined) return `${lines} ${lines === 1 ? "line" : "lines"}`;
   return null;
 }
@@ -165,8 +163,7 @@ const SELF_DESCRIBING = new Set([
 ]);
 
 function genericBody(tool: ToolState) {
-  const output =
-    typeof tool.rawOutput === "string" ? tool.rawOutput : stripFence(contentText(tool));
+  const output = tool.output ?? stripFence(contentText(tool));
   const described = tool.toolName !== null && SELF_DESCRIBING.has(tool.toolName);
   const input =
     described || tool.rawInput === undefined ? "" : JSON.stringify(tool.rawInput, null, 2);
@@ -194,10 +191,10 @@ export function ToolCall({ tool, renderChildren }: ToolCallProps) {
   const isBash = tool.toolName === "Bash";
   const [open, setOpen] = useState<boolean | null>(null);
   const [preview, setPreview] = useState(false);
-  const { toolResponse, content } = tool;
+  const { response, content } = tool;
   const rows = useMemo(
-    () => (isEdit ? diffRows(toolResponse, content) : []),
-    [isEdit, toolResponse, content],
+    () => (isEdit ? diffRows(response, content) : []),
+    [isEdit, response, content],
   );
 
   let meta: ReactNode = null;
@@ -235,7 +232,7 @@ export function ToolCall({ tool, renderChildren }: ToolCallProps) {
       );
     else if (rows.length > 0) body = <DiffView rows={rows} />;
   } else if (isBash) {
-    const command = stringField(tool.rawInput, "command") ?? "";
+    const command = tool.input.command ?? "";
     const { stdout, stderr } = bashOutput(tool);
     openByDefault = true;
     body = (

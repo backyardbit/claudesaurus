@@ -106,10 +106,7 @@ export function applyEnv(config: Config) {
 Tests pass. <kbd>ctrl</kbd>+<kbd>q</kbd> quits.`;
 
 function tool<Update extends SessionUpdate>(update: Update, toolName: string, parent?: string) {
-  return {
-    ...update,
-    _meta: { claudeCode: { toolName, ...(parent ? { parentToolUseId: parent } : {}) } },
-  };
+  return { ...update, _meta: { claudeCode: { toolName, parentToolUseId: parent } } };
 }
 
 function script(): [delay: number, message: MainMessage][] {

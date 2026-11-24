@@ -159,8 +159,8 @@ the file (in `profiles/`).
 ```sh
 pnpm dev:ui      # the chat page in a browser, with a scripted conversation (add ?static, ?dark or ?empty)
 pnpm start       # build, then run in this pane
-pnpm check       # format and lint (Biome), typecheck, unit tests
-pnpm lint:slop   # Oxlint with the anti-slop plugin (not yet part of check)
+pnpm check       # format and lint (Biome), anti-slop lint (Oxlint), typecheck, unit tests
+pnpm lint:slop   # just the anti-slop lint
 ```
 
 `tools/oxlint/anti-slop/` is a copy of Dillon Mulroy's anti-slop Oxlint plugin, configured in

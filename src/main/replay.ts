@@ -25,7 +25,9 @@ export function createReplayAgent(file: string, emit: (message: MainMessage) => 
   return {
     async start() {
       for (const line of fs.readFileSync(file, "utf8").split("\n")) {
-        if (line) emit(JSON.parse(line) as MainMessage);
+        if (!line) continue;
+        // SAFETY: the file is a messages.jsonl the debug capture wrote, one MainMessage a line.
+        emit(JSON.parse(line) as MainMessage);
       }
     },
     async prompt(text) {

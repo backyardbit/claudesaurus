@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { createRoot, type LoadOptions } from "@zenbu-labs/pixel";
+import { createRoot, type WebViewProps } from "@zenbu-labs/pixel";
+import { z } from "zod";
 import { MAIN_CHANNEL, type MainMessage, UI_CHANNEL, type UiMessage } from "../shared/protocol";
 import { createAgent, type ResumeTarget } from "./agent";
 import { startDebugCapture } from "./debug";
@@ -25,7 +26,18 @@ function agentEnv() {
   return env;
 }
 
-const { values: flags } = parseArgs({
+/** A flag left without its value is left out, as if it was not given. */
+const optionalString = z.string().optional().catch(undefined);
+
+const FlagsSchema = z.object({
+  model: optionalString,
+  effort: optionalString,
+  mode: optionalString,
+  resume: optionalString,
+  continue: z.boolean().optional().catch(undefined),
+});
+
+const { values } = parseArgs({
   args: process.argv.slice(2),
   options: {
     model: { type: "string" },
@@ -36,20 +48,21 @@ const { values: flags } = parseArgs({
   },
   strict: false,
 });
+const flags = FlagsSchema.parse(values);
 
 /** Session settings given on the command line, by ACP config option id. */
 function startupConfig() {
   const config: Record<string, string> = {};
   for (const id of ["model", "effort", "mode"] as const) {
     const value = flags[id];
-    if (typeof value === "string") config[id] = value;
+    if (value !== undefined) config[id] = value;
   }
   return config;
 }
 
 /** The past session the command line asks for: `--resume ID`, or `--continue` for the latest here. */
 function resumeTarget(): ResumeTarget | null {
-  if (typeof flags.resume === "string") return { kind: "session", sessionId: flags.resume };
+  if (flags.resume !== undefined) return { kind: "session", sessionId: flags.resume };
   return flags.continue ? { kind: "latest" } : null;
 }
 
@@ -74,7 +87,20 @@ function writeToTerminal(sequence: string) {
 const status = createStatusReporter(writeToTerminal);
 const usageStore = createUsageStore();
 
-const ZOOM_KEYS: Record<string, 1 | -1 | 0> = { "=": 1, "+": 1, "-": -1, "0": 0 };
+/** What Ctrl with a key does to the zoom: in, out, or back to the start. */
+function zoomStep(key: string) {
+  switch (key) {
+    case "=":
+    case "+":
+      return 1;
+    case "-":
+      return -1;
+    case "0":
+      return 0;
+    default:
+      return undefined;
+  }
+}
 
 const root = createRoot({
   name: "Claudesaurus",
@@ -92,7 +118,7 @@ const root = createRoot({
       quit();
       return true;
     }
-    const zoom = ZOOM_KEYS[event.key];
+    const zoom = zoomStep(event.key);
     if (zoom !== undefined) {
       view.zoom(zoom);
       return true;
@@ -110,20 +136,22 @@ const REX_PANE_RADIUS_PT = 10;
 const inRex = Boolean(process.env.REX_BLOCK);
 if (inRex) root.setClearColor([0, 0, 0, 0]);
 
-const view = root.loadFile(path.join(__dirname, "ui", "index.html"), {
+/**
+ * loadFile's options leave out `style`, but it applies them after its own full-size style, so a
+ * style given here is used. It replaces that one, so it repeats the full size.
+ */
+const pageOptions: Omit<WebViewProps, "src" | "hidden" | "autoFocus"> = {
   preload: path.join(__dirname, "preload.cjs"),
   onOpenWindow: () => "deny",
-  // loadFile sizes the page to fill the pane; a style given here replaces that, so it is repeated.
-  ...((inRex
-    ? {
-        style: {
-          width: "100%",
-          height: "100%",
-          cornerRadius: REX_PANE_RADIUS_PT * root.displayScale,
-        },
-      }
-    : {}) as LoadOptions),
-});
+};
+if (inRex) {
+  pageOptions.style = {
+    width: "100%",
+    height: "100%",
+    cornerRadius: REX_PANE_RADIUS_PT * root.displayScale,
+  };
+}
+const view = root.loadFile(path.join(__dirname, "ui", "index.html"), pageOptions);
 
 const debugDirectory = process.env.CLAUDESAURUS_DEBUG_DIR;
 const debug = debugDirectory ? startDebugCapture(debugDirectory, view.webContents) : null;
