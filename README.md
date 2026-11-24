@@ -48,7 +48,10 @@ Homebrew installs only the built app. The first run downloads the app's runtime,
 Electron and Claude Code, into `~/.local/share/claudesaurus`, which takes about a minute;
 `claudesaurus --setup` does it ahead of time. They are signed programs that Homebrew would rewrite
 and re-sign, which breaks Electron on macOS. If macOS still calls Electron damaged, the next run
-sees it and sets the runtime up again. Uninstalling leaves that folder behind.
+sees it and sets the runtime up again. When a newer release is published on GitHub, packaged
+installs download and prepare it in the background into the same folder, show a restart toast in the
+top right, and switch to it on `/restart` (or the next launch); set `CLAUDESAURUS_NO_AUTO_UPDATE=1`
+to disable. Uninstalling leaves that folder behind.
 
 From source, with Node 22 or newer and pnpm:
 
@@ -104,6 +107,8 @@ drawn again in the terminal.
 | `/`                      | Slash commands. `/new` or `/clear` starts a new chat,      |
 |                          | `/quit` closes. Enter runs the picked one, Tab fills it in |
 | `/resume`                | Pick a past chat from this directory; type to filter       |
+| `/restart`               | Restart Claudesaurus, apply any downloaded update, and     |
+|                          | reopen the current chat                                    |
 | `/agent`                 | Switch to another agent, starting a new chat; type to      |
 |                          | filter. Kept for later runs                                |
 | `/patches`, `/tiles`     | Choose how frames are drawn (see Performance)              |

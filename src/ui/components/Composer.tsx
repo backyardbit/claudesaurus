@@ -15,7 +15,7 @@ import { useActions, useAppState } from "../store";
 import { ConfigChips } from "./ConfigChips";
 import { ContextChip } from "./ContextChip";
 
-const MAX_COMMANDS = 8;
+const MAX_COMMANDS = 10;
 const MAX_SESSIONS = 10;
 
 /** Commands the page answers itself, listed ahead of the agent's own. */
@@ -23,6 +23,7 @@ const LOCAL_COMMANDS: AvailableCommand[] = [
   { name: "new", description: "Start a new chat" },
   { name: "clear", description: "Start a new chat, as /new does" },
   { name: "resume", description: "Open a past chat from this folder" },
+  { name: "restart", description: "Restart Claudesaurus and resume this chat" },
   { name: "agent", description: "Switch to another agent, such as Codex, Grok or Antigravity" },
   { name: "patches", description: "Draw only the areas that change: much less data to send" },
   { name: "tiles", description: "Draw in tiles, PixelGUI's usual way in Rex" },
@@ -61,12 +62,29 @@ const TYPED_INPUT = new Set(["insertText", "insertLineBreak", "insertParagraph"]
 /** How long after a handled key press its own character can still arrive. */
 const CONSUMED_KEY_WINDOW_MS = 100;
 
-export function matchCommands(commands: AvailableCommand[], text: string, canResume: boolean) {
+export function matchCommands(
+  commands: AvailableCommand[],
+  text: string,
+  canResume: boolean,
+  updateVersion: string | null = null,
+) {
   const match = /^\/(\S*)$/.exec(text);
   if (!match) return [];
   const query = (match[1] ?? "").toLowerCase();
-  const local = LOCAL_COMMANDS.filter((command) => canResume || command.name !== "resume");
-  const all = [...local, ...commands.filter((command) => !LOCAL_NAMES.has(command.name))];
+  const local = LOCAL_COMMANDS.filter((command) => canResume || command.name !== "resume").map(
+    (command) =>
+      command.name === "restart" && updateVersion
+        ? { ...command, description: `Apply update v${updateVersion} and resume this chat` }
+        : command,
+  );
+  // Put `/restart` first when an update is waiting, so typing `/` surfaces it immediately.
+  const orderedLocal = updateVersion
+    ? [
+        ...local.filter((command) => command.name === "restart"),
+        ...local.filter((command) => command.name !== "restart"),
+      ]
+    : local;
+  const all = [...orderedLocal, ...commands.filter((command) => !LOCAL_NAMES.has(command.name))];
   const starts = all.filter((command) => command.name.toLowerCase().startsWith(query));
   const contains = all.filter(
     (command) =>
@@ -131,6 +149,7 @@ export function Composer() {
   const zen = useAppState((state) => state.zen);
   const agent = useAppState((state) => state.agent);
   const agents = useAppState((state) => state.agents);
+  const updateVersion = useAppState((state) => state.updateVersion);
   const auth = useAppState((state) => (state.phase === "auth" ? state.auth : null));
   const canResume = session?.features.resume ?? false;
   const agentName = agent?.name ?? "the agent";
@@ -149,8 +168,8 @@ export function Composer() {
   const choosingAgent = agentQuery !== null;
   const picking = resuming || choosingAgent;
   const matches = useMemo(
-    () => (menuDismissed || picking ? [] : matchCommands(commands, text, canResume)),
-    [commands, text, menuDismissed, picking, canResume],
+    () => (menuDismissed || picking ? [] : matchCommands(commands, text, canResume, updateVersion)),
+    [commands, text, menuDismissed, picking, canResume, updateVersion],
   );
   const agentMatches = useMemo(
     () => (agentQuery === null || menuDismissed ? [] : matchAgents(agents ?? [], agentQuery)),
@@ -273,13 +292,18 @@ export function Composer() {
   /** Sends the input, or queues it while the agent works unless `now` sends it into the turn. */
   function submit(now = false, value = text) {
     const command = value.trim();
-    // Switching agents and quitting work while an agent cannot start, too.
+    // Switching agents, restarting and quitting work while an agent cannot start, too.
     if (command === "/agent") {
       setText("/agent ");
       setMenuDismissed(false);
       return;
     }
     if (choosingAgent) return;
+    if (command === "/restart") {
+      actions.restart();
+      setText("");
+      return;
+    }
     if (command === "/quit" || command === "/exit") {
       actions.quit();
       return;

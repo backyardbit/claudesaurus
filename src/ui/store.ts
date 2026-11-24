@@ -108,6 +108,10 @@ export type State = {
   replaying: boolean;
   /** `/zen`: the conversation shows only what was said, without tool calls, thoughts or the plan. */
   zen: boolean;
+  /** Version of a downloaded update waiting for `/restart`, or null when up to date. */
+  updateVersion: string | null;
+  /** True after the user closes the update toast; `/restart` still applies the update. */
+  updateDismissed: boolean;
   toast: string | null;
 };
 
@@ -132,6 +136,8 @@ export const initialState: State = {
   agents: null,
   replaying: false,
   zen: false,
+  updateVersion: null,
+  updateDismissed: false,
   toast: null,
 };
 
@@ -373,6 +379,8 @@ export function reduce(state: State, message: MainMessage, now: number): State {
         connectingDetail: message.detail,
         toast: state.toast,
         zen: state.zen,
+        updateVersion: state.updateVersion,
+        updateDismissed: state.updateDismissed,
       };
     case "auth":
       return { ...state, phase: "auth", auth: message.auth };
@@ -388,12 +396,17 @@ export function reduce(state: State, message: MainMessage, now: number): State {
         configOptions: message.session.configOptions,
         commands: state.commands,
         zen: state.zen,
+        updateVersion: state.updateVersion,
+        updateDismissed: state.updateDismissed,
         replaying: message.session.loadingHistory,
       };
     case "historyLoaded":
       return { ...state, replaying: false };
     case "zen":
       return { ...state, zen: message.zen };
+    case "updateReady":
+      if (message.version === state.updateVersion) return state;
+      return { ...state, updateVersion: message.version, updateDismissed: false };
     case "sessions":
       return { ...state, pastSessions: message.sessions };
     case "account":
@@ -591,6 +604,13 @@ export function createStore(bridge: Bridge) {
     openLink(url: string) {
       bridge.send({ type: "openLink", url });
       showToast("Link copied");
+    },
+    restart() {
+      if (state.running) bridge.send({ type: "cancel" });
+      bridge.send({ type: "restart" });
+    },
+    dismissUpdate() {
+      set({ ...state, updateDismissed: true });
     },
     quit() {
       bridge.send({ type: "quit" });

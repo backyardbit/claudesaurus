@@ -1462,3 +1462,52 @@ kbd {
   font-size: 0.85rem;
   z-index: 30;
 }
+
+.update-toast {
+  position: fixed;
+  top: 0.8rem;
+  right: 1rem;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.25rem 0.3rem 0.25rem 0.7rem;
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--line));
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: 0 4px 16px color-mix(in oklab, black 12%, transparent);
+  font-size: 0.83rem;
+}
+
+.update-toast-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.update-toast-label {
+  color: var(--fg);
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.chip.update-toast-action {
+  height: 1.55rem;
+  padding: 0 0.55rem;
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--line));
+  background: color-mix(in oklab, var(--accent) 11%, var(--raised));
+  color: color-mix(in oklab, var(--accent) 75%, var(--fg));
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 550;
+}
+
+.chip.update-toast-action:hover {
+  background: color-mix(in oklab, var(--accent) 20%, var(--raised));
+}
+
+.update-toast .icon-button {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+}

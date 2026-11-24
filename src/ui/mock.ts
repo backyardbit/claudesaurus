@@ -342,6 +342,9 @@ export function createMockBridge(): Bridge {
             ],
           },
         });
+        if (new URLSearchParams(location.search).has("update")) {
+          emit({ type: "updateReady", version: "0.4.0" });
+        }
         if (!new URLSearchParams(location.search).has("empty")) void play(script());
         break;
       case "prompt":
