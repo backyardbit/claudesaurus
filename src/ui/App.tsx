@@ -118,7 +118,7 @@ export function App() {
   return (
     <div className="app">
       <div className="scroller" ref={scroller} onScroll={onScroll}>
-        <div className={items.length > 0 ? "column filled" : "column"} ref={column}>
+        <div className={running && items.length > 0 ? "column reserve" : "column"} ref={column}>
           {items.length === 0 && phase !== "failed" && <Welcome />}
           <Timeline items={items} permissions={permissions} running={running} />
           {running && turnStartedAt !== null && <Working since={turnStartedAt} />}
