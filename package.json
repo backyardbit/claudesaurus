@@ -1,6 +1,6 @@
 {
   "name": "claudesaurus",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A graphical Claude Code chat for the Rex terminal, built on PixelGUI and ACP.",
   "scripts": {
     "build": "node scripts/build.mjs",
