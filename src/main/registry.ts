@@ -48,10 +48,16 @@ export type BinaryTarget = z.infer<typeof BinaryTargetSchema>;
 
 const PackageSchema = z.object({ package: z.string(), args: z.array(z.string()).optional() });
 
+/**
+ * An id or version names a folder in the download cache, so it must be a single plain path
+ * segment: an entry that could climb out of the cache is left out.
+ */
+const PathSegmentSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/);
+
 const RegistryAgentSchema = z.object({
-  id: z.string(),
+  id: PathSegmentSchema,
   name: z.string(),
-  version: z.string(),
+  version: PathSegmentSchema,
   description: z.string().optional(),
   distribution: z.object({
     binary: z.record(z.string(), BinaryTargetSchema).optional(),

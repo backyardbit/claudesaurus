@@ -68,6 +68,19 @@ test("reads the agents of an index and leaves out entries it cannot read", () =>
   expect(agent("grok-build").distribution.npx?.args).toEqual(["agent", "stdio"]);
 });
 
+test("leaves out an entry whose id or version could climb out of the download cache", () => {
+  const entry = (id: string, version: string) => ({
+    id,
+    name: id,
+    version,
+    distribution: { npx: { package: "x" } },
+  });
+  const json = JSON.stringify({
+    agents: [entry("../escape", "1.0.0"), entry("ok", "../../x"), entry("fine", "1.2.0-rc.1")],
+  });
+  expect(parseRegistry(json).map((found) => found.id)).toEqual(["fine"]);
+});
+
 test("an index that is not JSON, or has no agents, lists none", () => {
   expect(parseRegistry("<html>")).toEqual([]);
   expect(parseRegistry('{"version":"1.0.0"}')).toEqual([]);
