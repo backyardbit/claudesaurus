@@ -66,7 +66,16 @@ claudesaurus --model opus --effort high       # start with these settings
 claudesaurus --mode plan                      # default, acceptEdits, plan, auto, bypassPermissions
 claudesaurus --continue                       # reopen the latest session in this directory
 claudesaurus --resume SESSION_ID              # reopen a session, including one from the claude CLI
+claudesaurus --remove-rex-actions             # take the split actions out of Rex's palette
 ```
+
+In Rex, the command palette (Cmd+K) gets two actions, **Claudesaurus: Open in Horizontal Split**
+(a new pane to the right) and **Claudesaurus: Open in Vertical Split** (below), both working in
+the focused pane's folder. Claudesaurus adds them itself on its first run or with `--setup`, and
+keeps them up to date: it copies `rex/claudesaurus.lua` to `~/.config/rex/plugins/claudesaurus/`
+and loads it from a marked block in `~/.config/rex/init.lua` (or `$REX_CONFIG`). The actions
+start whichever install ran last, a Homebrew one or a source checkout.
+`--remove-rex-actions` leaves an empty marked block behind, so later runs keep them out.
 
 Every session adds a note to Claude's system prompt (`src/main/systemPrompt.ts`) saying what the
 chat can draw, so Claude answers "show me" with an inline `html` block instead of writing a file.

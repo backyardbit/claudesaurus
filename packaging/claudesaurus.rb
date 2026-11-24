@@ -14,6 +14,7 @@ class Claudesaurus < Formula
     libexec.install Dir["*"]
     (bin/"claudesaurus").write <<~SH
       #!/bin/bash
+      export CLAUDESAURUS_LAUNCHER="#{opt_bin}/claudesaurus"
       exec "#{Formula["node"].opt_bin}/node" "#{libexec}/bin/claudesaurus.mjs" "$@"
     SH
   end
@@ -30,6 +31,11 @@ class Claudesaurus < Formula
 
       Run `claudesaurus` in a terminal that draws images with the Kitty graphics protocol,
       such as Rex, Ghostty or kitty.
+
+      In Rex, the first run (or `claudesaurus --setup`) adds two actions to the command palette,
+      to open Claudesaurus in a horizontal or vertical split. They are loaded from a marked
+      block in ~/.config/rex/init.lua. To take them out, run:
+        claudesaurus --remove-rex-actions
     EOS
   end
 
