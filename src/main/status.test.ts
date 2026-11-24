@@ -55,9 +55,9 @@ function tool(title: string): MainMessage {
 test("encodes a report with the app name and a base64 message", () => {
   const report: StatusReport = { state: "working", message: "Edit a.ts" };
   expect(encodeStatus(report)).toBe(
-    `\x1b]7501;state=working:app=claudesaurus:msg=${btoa("Edit a.ts")}\x1b\\`,
+    `\x1b]7501;state=working:app=claude-code:msg=${btoa("Edit a.ts")}\x1b\\`,
   );
-  expect(encodeStatus({ state: "idle" })).toBe("\x1b]7501;state=idle:app=claudesaurus\x1b\\");
+  expect(encodeStatus({ state: "idle" })).toBe("\x1b]7501;state=idle:app=claude-code\x1b\\");
 });
 
 test("keeps control characters and long text out of a report", () => {

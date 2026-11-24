@@ -1,7 +1,10 @@
 import type { MainMessage } from "../shared/protocol";
 
-/** The name this program reports itself under, which terminals use to group and label records. */
-const APP = "claudesaurus";
+/**
+ * The name this program reports itself under, which terminals use to group, label and pick an
+ * icon for records. Claudesaurus is a front end for Claude Code, so it reports as Claude Code.
+ */
+const APP = "claude-code";
 
 const MAX_TEXT_LENGTH = 200;
 
