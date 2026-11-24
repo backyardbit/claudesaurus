@@ -41,7 +41,8 @@ brew install backyardbit/tap/claudesaurus
 Homebrew installs only the built app. The first run downloads the app's runtime, PixelGUI's
 Electron and Claude Code, into `~/.local/share/claudesaurus`, which takes about a minute;
 `claudesaurus --setup` does it ahead of time. They are signed programs that Homebrew would rewrite
-and re-sign, which breaks Electron on macOS. Uninstalling leaves that folder behind.
+and re-sign, which breaks Electron on macOS. If macOS still calls Electron damaged, the next run
+sees it and sets the runtime up again. Uninstalling leaves that folder behind.
 
 From source, with Node 22 or newer and pnpm:
 
