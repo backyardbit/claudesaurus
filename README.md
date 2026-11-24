@@ -148,6 +148,15 @@ the strip that came into view. Three things make that work:
 Chromium draws on the CPU when the GPU cannot be used, which costs two to three cores while
 scrolling. Check `~/.local/state/pixel/logs/claudesaurus.stderr.log` for GPU errors.
 
+The same patch keeps resizing calm. PixelGUI gave the page's box the pane's new size at once and
+filled it with the old frame, squashed or stretched to fit, until Chromium painted the page at the
+new size about 25 ms later, so a drag squashed the whole page on every step. Now the box keeps the
+size of the frame on show and takes a new frame's size just before that frame is drawn, and the
+page is resized at most every 100 ms during a drag. A single resize lands at once, and the last
+size of a drag always lands.
+On a 40-step drag of a 1464x1749 pane's width, in `/patches`, frames drawn went from 42 to 21,
+squashed draws from 34 to 12, and the times the pane was laid out again from 98 to 58.
+
 How frames are drawn is a setting, saved in `~/.config/claudesaurus/settings.json`:
 
 - `/tiles` (the default) is what PixelGUI does in Rex: it resends a 256 px tile around each change.
