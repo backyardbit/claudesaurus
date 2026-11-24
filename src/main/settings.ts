@@ -8,11 +8,13 @@ const SettingsSchema = z.object({
   drawing: z.enum(["tiles", "patches"]).catch("tiles"),
   /** `/zen`: the conversation without tool calls and thoughts. */
   zen: z.boolean().catch(false),
+  /** The agent `/agent` last switched to, by ACP registry id or short name. */
+  agent: z.string().catch("claude"),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
 
-const DEFAULTS: Settings = { drawing: "tiles", zen: false };
+const DEFAULTS: Settings = { drawing: "tiles", zen: false, agent: "claude" };
 
 function settingsFile() {
   const config = process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config");

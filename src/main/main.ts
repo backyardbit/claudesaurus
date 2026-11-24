@@ -4,8 +4,10 @@ import { parseArgs } from "node:util";
 import { createRoot, type WebViewProps } from "@zenbu-labs/pixel";
 import { z } from "zod";
 import { MAIN_CHANNEL, type MainMessage, UI_CHANNEL, type UiMessage } from "../shared/protocol";
-import { createAgent, type ResumeTarget } from "./agent";
+import { type Agent, createAgent, type ResumeTarget } from "./agent";
 import { startDebugCapture } from "./debug";
+import { agentChoices, openRexPane, prepareLaunch } from "./launch";
+import { agentName, resolveAgentId } from "./registry";
 import { createReplayAgent } from "./replay";
 import { loadSettings, saveSettings } from "./settings";
 import { createStatusReporter } from "./status";
@@ -14,7 +16,7 @@ import { createUsageStore } from "./usageStore";
 
 const cwd = process.cwd();
 
-/** Variables the pixel runtime sets for itself; Claude's own shell commands must not inherit them. */
+/** Variables the pixel runtime sets for itself; the agent's shell commands must not inherit them. */
 const RUNTIME_ENV_PREFIXES = ["ELECTRON_", "PIXEL_", "CHROME_"];
 
 function agentEnv() {
@@ -35,6 +37,7 @@ const FlagsSchema = z.object({
   mode: optionalString,
   resume: optionalString,
   continue: z.boolean().optional().catch(undefined),
+  agent: optionalString,
 });
 
 const { values } = parseArgs({
@@ -45,17 +48,18 @@ const { values } = parseArgs({
     mode: { type: "string" },
     resume: { type: "string" },
     continue: { type: "boolean" },
+    agent: { type: "string" },
   },
   strict: false,
 });
 const flags = FlagsSchema.parse(values);
 
-/** Session settings given on the command line, by ACP config option id. */
+/** Session settings given on the command line, by name. */
 function startupConfig() {
-  const config: Record<string, string> = {};
-  for (const id of ["model", "effort", "mode"] as const) {
-    const value = flags[id];
-    if (value !== undefined) config[id] = value;
+  const config = new Map<string, string>();
+  for (const name of ["model", "effort", "mode"] as const) {
+    const value = flags[name];
+    if (value !== undefined) config.set(name, value);
   }
   return config;
 }
@@ -187,6 +191,8 @@ let sessionId: string | null = null;
 function emit(message: MainMessage) {
   debug?.record(message);
   status.observe(message);
+  // Another agent starting replaces everything shown before, and its progress replaces itself.
+  if (message.type === "connecting") history = [];
   if (message.type === "session") {
     sessionId = message.session.sessionId;
     history = history.filter((earlier) => earlier.type === "account");
@@ -198,8 +204,8 @@ function emit(message: MainMessage) {
   if (message.type === "update" && message.update.sessionUpdate === "usage_update" && sessionId) {
     usageStore.set(sessionId, { used: message.update.used, size: message.update.size });
   }
-  // A session list answers one request; a page that reloads asks again.
-  if (message.type !== "sessions") history.push(message);
+  // A list answers one request; a page that reloads asks again.
+  if (message.type !== "sessions" && message.type !== "agents") history.push(message);
   if (pageReady) view.webContents.send(MAIN_CHANNEL, message);
   if (message.type === "historyLoaded") restoreUsage();
 }
@@ -211,19 +217,55 @@ function restoreUsage() {
 }
 
 const adapterPackage = require.resolve("@agentclientprotocol/claude-agent-acp/package.json");
+const claude = {
+  nodePath: process.env.CLAUDESAURUS_NODE ?? "node",
+  adapterEntry: path.join(path.dirname(adapterPackage), "dist", "index.js"),
+};
 
-const agent = process.env.CLAUDESAURUS_REPLAY
+/** `--agent` picks the agent for this run; otherwise the one last picked with `/agent`. */
+const firstAgentId = resolveAgentId(flags.agent ?? settings.agent);
+
+/**
+ * Starts an agent. The first one gets what the command line asked for; one picked later with
+ * `/agent` starts plain, since a model or mode named for one agent rarely means much to another.
+ */
+function startAgent(
+  agentId: string,
+  resume: ResumeTarget | null,
+  config = new Map<string, string>(),
+): Agent {
+  const started = createAgent({
+    cwd,
+    env: agentEnv(),
+    agent: { id: agentId, name: agentName(agentId, null) },
+    prepare: (report) => prepareLaunch(agentId, claude, report),
+    startupConfig: config,
+    resume,
+    systemPromptAppend: SYSTEM_PROMPT_APPEND,
+    openTerminal: (command, label) => openRexPane(command, cwd, label),
+    emit,
+  });
+  void started.start();
+  return started;
+}
+
+let agent: Agent = process.env.CLAUDESAURUS_REPLAY
   ? createReplayAgent(process.env.CLAUDESAURUS_REPLAY, emit)
-  : createAgent({
-      cwd,
-      nodePath: process.env.CLAUDESAURUS_NODE ?? "node",
-      adapterEntry: path.join(path.dirname(adapterPackage), "dist", "index.js"),
-      env: agentEnv(),
-      startupConfig: startupConfig(),
-      resume: resumeTarget(),
-      systemPromptAppend: SYSTEM_PROMPT_APPEND,
-      emit,
-    });
+  : startAgent(firstAgentId, resumeTarget(), startupConfig());
+if (process.env.CLAUDESAURUS_REPLAY) void agent.start();
+
+/** Starts a new session on another agent, and makes it the one the next launch starts with. */
+function switchAgent(nextId: string) {
+  agent.dispose();
+  settings.agent = nextId;
+  saveSettings(settings);
+  agent = startAgent(nextId, null);
+}
+
+async function listAgents() {
+  const version = JSON.parse(fs.readFileSync(adapterPackage, "utf8")).version ?? "";
+  emit({ type: "agents", agents: await agentChoices(String(version)) });
+}
 
 function quit() {
   debug?.stop();
@@ -269,6 +311,18 @@ view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
     case "resume":
       void agent.resume(message.sessionId);
       break;
+    case "listAgents":
+      void listAgents();
+      break;
+    case "switchAgent":
+      switchAgent(message.agentId);
+      break;
+    case "authenticate":
+      void agent.authenticate(message.methodId);
+      break;
+    case "retryAuth":
+      void agent.retryAuth();
+      break;
     case "setDrawing":
       settings.drawing = message.drawing;
       saveSettings(settings);
@@ -303,5 +357,3 @@ view.webContents.on("did-finish-load", () => {
   view.webContents.setZoomFactor(terminalFontPx / DESIGN_TERMINAL_FONT_PX);
   debug?.note("info", { ...root.info, displayScale: root.displayScale });
 });
-
-void agent.start();

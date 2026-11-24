@@ -1,15 +1,16 @@
 import { ShieldQuestion } from "lucide-react";
-import { type PermissionRequest, useActions } from "../store";
+import { type PermissionRequest, useActions, useAppState } from "../store";
 
 const REJECT_KINDS = new Set(["reject_once", "reject_always"]);
 
 export function Permission({ request }: { request: PermissionRequest }) {
   const actions = useActions();
+  const agentName = useAppState((state) => state.agent?.name ?? "The agent");
   return (
     <div className="permission">
       <div className="permission-title">
         <ShieldQuestion size={15} />
-        <span>{request.toolCall.title ?? "Claude wants to use a tool"}</span>
+        <span>{request.toolCall.title ?? `${agentName} wants to use a tool`}</span>
       </div>
       <div className="permission-options">
         {request.options.map((option, index) => (

@@ -14,6 +14,9 @@ import type {
 import { useSyncExternalStore } from "react";
 import type {
   AccountInfo,
+  AgentChoice,
+  AgentIdentity,
+  AuthRequest,
   Bridge,
   Drawing,
   MainMessage,
@@ -78,8 +81,14 @@ export type Draft = { text: string; images: PromptImage[] };
 export type Usage = { used: number; size: number };
 
 export type State = {
-  phase: "connecting" | "ready" | "failed";
+  /** `auth` waits for the user to sign in to the agent before a session can open. */
+  phase: "connecting" | "auth" | "ready" | "failed";
   failure: string | null;
+  /** The agent that is starting or running. */
+  agent: AgentIdentity | null;
+  /** How far along starting the agent is, such as a download's progress. */
+  connectingDetail: string | null;
+  auth: AuthRequest | null;
   session: SessionInfo | null;
   account: AccountInfo | null;
   configOptions: SessionConfigOption[];
@@ -93,6 +102,8 @@ export type State = {
   commands: AvailableCommand[];
   /** Sessions `/resume` can open, or null while they are being listed. */
   pastSessions: PastSession[] | null;
+  /** Agents `/agent` can switch to, or null while they are being listed. */
+  agents: AgentChoice[] | null;
   /** True while a past session's conversation is being replayed into the page. */
   replaying: boolean;
   /** `/zen`: the conversation shows only what was said, without tool calls, thoughts or the plan. */
@@ -103,6 +114,9 @@ export type State = {
 export const initialState: State = {
   phase: "connecting",
   failure: null,
+  agent: null,
+  connectingDetail: null,
+  auth: null,
   session: null,
   account: null,
   configOptions: [],
@@ -115,6 +129,7 @@ export const initialState: State = {
   usage: null,
   commands: [],
   pastSessions: null,
+  agents: null,
   replaying: false,
   zen: false,
   toast: null,
@@ -348,11 +363,26 @@ function applyUpdate(state: State, update: SessionUpdate, now: number): State {
 export function reduce(state: State, message: MainMessage, now: number): State {
   switch (message.type) {
     case "connecting":
-      return { ...state, phase: "connecting" };
+      // An agent starting begins a new conversation; one already starting only reports progress.
+      return {
+        ...(state.phase === "connecting" && state.agent?.id === message.agent.id
+          ? state
+          : initialState),
+        phase: "connecting",
+        agent: message.agent,
+        connectingDetail: message.detail,
+        toast: state.toast,
+        zen: state.zen,
+      };
+    case "auth":
+      return { ...state, phase: "auth", auth: message.auth };
+    case "agents":
+      return { ...state, agents: message.agents };
     case "session":
       return {
         ...initialState,
         phase: "ready",
+        agent: message.session.agent,
         account: state.account,
         session: message.session,
         configOptions: message.session.configOptions,
@@ -469,14 +499,22 @@ export function createStore(bridge: Bridge) {
     toastTimer = window.setTimeout(() => set({ ...state, toast: null }), 1800);
   }
 
-  /** Sends a message into the running turn, so Claude reads it before it carries on. */
+  /**
+   * Sends a message into the running turn, so the agent reads it before it carries on. An agent
+   * that cannot take one mid-turn gets it first thing after the turn instead.
+   */
   function sendNow(draft: Draft) {
-    if (state.running) bridge.send({ type: "steer", text: draft.text, images: draft.images });
-    else sendDraft(draft);
+    if (!state.running) sendDraft(draft);
+    else if (state.session?.features.steer) {
+      bridge.send({ type: "steer", text: draft.text, images: draft.images });
+    } else {
+      set({ ...state, queue: [draft, ...state.queue] });
+      showToast(`${state.agent?.name ?? "The agent"} takes it after this turn`);
+    }
   }
 
   const actions = {
-    /** Sends a message, or queues it while Claude works unless `now` sends it into the turn. */
+    /** Sends a message, or queues it while the agent works unless `now` sends it into the turn. */
     send(draft: Draft, { now = false } = {}) {
       if (state.phase !== "ready") return;
       if (state.running && !now) set({ ...state, queue: [...state.queue, draft] });
@@ -488,6 +526,14 @@ export function createStore(bridge: Bridge) {
     sendQueuedNow(index: number) {
       const draft = state.queue[index];
       if (!draft) return;
+      if (state.running && !state.session?.features.steer) {
+        set({
+          ...state,
+          queue: [draft, ...state.queue.filter((_, position) => position !== index)],
+        });
+        showToast(`${state.agent?.name ?? "The agent"} takes it after this turn`);
+        return;
+      }
       set({ ...state, queue: state.queue.filter((_, position) => position !== index) });
       sendNow(draft);
     },
@@ -522,6 +568,21 @@ export function createStore(bridge: Bridge) {
     resume(sessionId: string) {
       if (state.running) bridge.send({ type: "cancel" });
       bridge.send({ type: "resume", sessionId });
+    },
+    /** Lists the agents `/agent` can switch to, afresh each time it is typed. */
+    listAgents() {
+      set({ ...state, agents: null });
+      bridge.send({ type: "listAgents" });
+    },
+    switchAgent(agentId: string) {
+      if (state.running) bridge.send({ type: "cancel" });
+      bridge.send({ type: "switchAgent", agentId });
+    },
+    authenticate(methodId: string) {
+      bridge.send({ type: "authenticate", methodId });
+    },
+    retryAuth() {
+      bridge.send({ type: "retryAuth" });
     },
     copy(text: string, label = "Copied") {
       bridge.send({ type: "copy", text });

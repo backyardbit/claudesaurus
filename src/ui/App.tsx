@@ -1,5 +1,6 @@
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AuthPrompt } from "./components/AuthPrompt";
 import { Composer } from "./components/Composer";
 import { PlanPill } from "./components/PlanPill";
 import { Timeline } from "./components/Timeline";
@@ -16,12 +17,15 @@ const SENT_MARGIN = 16;
 function Welcome() {
   const session = useAppState((state) => state.session);
   const account = useAppState((state) => state.account);
+  const phase = useAppState((state) => state.phase);
+  const detail = useAppState((state) => state.connectingDetail);
   return (
     <div className="welcome">
       <div className="welcome-mark">🦕</div>
       <h1>Claudesaurus</h1>
       {session && <p className="mono dim">{shortPath(session.cwd)}</p>}
       {account && <p className="dim">{account.label}</p>}
+      {phase === "connecting" && detail && <p className="dim">{detail}</p>}
       <p className="dim hints">
         <kbd>enter</kbd> send · <kbd>shift</kbd>+<kbd>enter</kbd> new line · <kbd>esc</kbd> stop ·{" "}
         <kbd>ctrl</kbd>+<kbd>q</kbd> quit
@@ -40,6 +44,8 @@ export function App() {
   const plan = useAppState((state) => state.plan);
   const toast = useAppState((state) => state.toast);
   const zen = useAppState((state) => state.zen);
+  const agentName = useAppState((state) => state.agent?.name ?? "The agent");
+  const auth = useAppState((state) => (state.phase === "auth" ? state.auth : null));
 
   const scroller = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
@@ -104,13 +110,15 @@ export function App() {
           {items.length === 0 && phase !== "failed" && <Welcome />}
           <Timeline items={items} permissions={permissions} running={running} zen={zen} />
           {running && turnStartedAt !== null && <Working since={turnStartedAt} />}
+          {auth && <AuthPrompt agentName={agentName} auth={auth} />}
           {phase === "failed" && (
             <div className="notice error fatal">
               <div>
-                <strong>Claude stopped</strong>
+                <strong>{agentName} stopped</strong>
                 <pre>{failure}</pre>
                 <div className="dim">
-                  Press <kbd>ctrl</kbd>+<kbd>q</kbd> to quit, then start claudesaurus again.
+                  Type <kbd>/agent</kbd> to switch to another agent, or press <kbd>ctrl</kbd>+
+                  <kbd>q</kbd> to quit and start claudesaurus again.
                 </div>
               </div>
             </div>

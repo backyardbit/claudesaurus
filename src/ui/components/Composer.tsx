@@ -1,5 +1,5 @@
 import type { AvailableCommand } from "@agentclientprotocol/sdk";
-import { ArrowUp, CornerDownLeft, Folder, Leaf, Square, X } from "lucide-react";
+import { ArrowUp, Bot, CornerDownLeft, Folder, Leaf, Square, X } from "lucide-react";
 import {
   type ClipboardEvent,
   type KeyboardEvent,
@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { PastSession, PromptImage } from "../../shared/protocol";
+import type { AgentChoice, PastSession, PromptImage } from "../../shared/protocol";
 import { formatAge, shortPath } from "../format";
 import { useActions, useAppState } from "../store";
 import { ConfigChips } from "./ConfigChips";
@@ -18,11 +18,12 @@ import { ContextChip } from "./ContextChip";
 const MAX_COMMANDS = 8;
 const MAX_SESSIONS = 10;
 
-/** Commands the page answers itself, listed ahead of Claude's own. */
+/** Commands the page answers itself, listed ahead of the agent's own. */
 const LOCAL_COMMANDS: AvailableCommand[] = [
   { name: "new", description: "Start a new chat" },
   { name: "clear", description: "Start a new chat, as /new does" },
   { name: "resume", description: "Open a past chat from this folder" },
+  { name: "agent", description: "Switch to another agent, such as Codex, Grok or Antigravity" },
   { name: "patches", description: "Draw only the areas that change: much less data to send" },
   { name: "tiles", description: "Draw in tiles, PixelGUI's usual way in Rex" },
   { name: "zen", description: "Hide tool calls and thoughts, or show them again" },
@@ -33,6 +34,9 @@ const LOCAL_NAMES = new Set(LOCAL_COMMANDS.map((command) => command.name));
 
 /** `/resume` and what follows it, which picks a past session. */
 const RESUME_PATTERN = /^\/resume\s+(.*)$/s;
+
+/** `/agent` and what follows it, which picks an agent. */
+const AGENT_PATTERN = /^\/agent\s+(.*)$/s;
 
 const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -57,11 +61,12 @@ const TYPED_INPUT = new Set(["insertText", "insertLineBreak", "insertParagraph"]
 /** How long after a handled key press its own character can still arrive. */
 const CONSUMED_KEY_WINDOW_MS = 100;
 
-function matchCommands(commands: AvailableCommand[], text: string) {
+export function matchCommands(commands: AvailableCommand[], text: string, canResume: boolean) {
   const match = /^\/(\S*)$/.exec(text);
   if (!match) return [];
   const query = (match[1] ?? "").toLowerCase();
-  const all = [...LOCAL_COMMANDS, ...commands.filter((command) => !LOCAL_NAMES.has(command.name))];
+  const local = LOCAL_COMMANDS.filter((command) => canResume || command.name !== "resume");
+  const all = [...local, ...commands.filter((command) => !LOCAL_NAMES.has(command.name))];
   const starts = all.filter((command) => command.name.toLowerCase().startsWith(query));
   const contains = all.filter(
     (command) =>
@@ -77,6 +82,17 @@ export function matchSessions(sessions: PastSession[], query: string, currentId:
     .filter((past) => past.sessionId !== currentId)
     .filter((past) => {
       const haystack = `${past.title ?? ""} ${past.sessionId}`.toLowerCase();
+      return words.every((word) => haystack.includes(word));
+    })
+    .slice(0, MAX_SESSIONS);
+}
+
+/** The agents whose name, id or description holds every word of the query. */
+export function matchAgents(agents: AgentChoice[], query: string) {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  return agents
+    .filter((agent) => {
+      const haystack = `${agent.name} ${agent.id} ${agent.description ?? ""}`.toLowerCase();
       return words.every((word) => haystack.includes(word));
     })
     .slice(0, MAX_SESSIONS);
@@ -113,6 +129,11 @@ export function Composer() {
   const pastSessions = useAppState((state) => state.pastSessions);
   const pendingPermission = useAppState((state) => state.permissions[0] ?? null);
   const zen = useAppState((state) => state.zen);
+  const agent = useAppState((state) => state.agent);
+  const agents = useAppState((state) => state.agents);
+  const auth = useAppState((state) => (state.phase === "auth" ? state.auth : null));
+  const canResume = session?.features.resume ?? false;
+  const agentName = agent?.name ?? "the agent";
 
   const [text, setText] = useState("");
   const [images, setImages] = useState<PromptImage[]>([]);
@@ -122,11 +143,18 @@ export function Composer() {
   /** When a key press was last handled as a command, so the character it types can be dropped. */
   const consumedKeyAt = useRef(Number.NEGATIVE_INFINITY);
 
-  const resumeQuery = RESUME_PATTERN.exec(text)?.[1] ?? null;
+  const resumeQuery = canResume ? (RESUME_PATTERN.exec(text)?.[1] ?? null) : null;
   const resuming = resumeQuery !== null;
+  const agentQuery = AGENT_PATTERN.exec(text)?.[1] ?? null;
+  const choosingAgent = agentQuery !== null;
+  const picking = resuming || choosingAgent;
   const matches = useMemo(
-    () => (menuDismissed || resuming ? [] : matchCommands(commands, text)),
-    [commands, text, menuDismissed, resuming],
+    () => (menuDismissed || picking ? [] : matchCommands(commands, text, canResume)),
+    [commands, text, menuDismissed, picking, canResume],
+  );
+  const agentMatches = useMemo(
+    () => (agentQuery === null || menuDismissed ? [] : matchAgents(agents ?? [], agentQuery)),
+    [agents, agentQuery, menuDismissed],
   );
   const sessionMatches = useMemo(
     () =>
@@ -135,26 +163,37 @@ export function Composer() {
         : matchSessions(pastSessions ?? [], resumeQuery, session?.sessionId ?? null),
     [pastSessions, resumeQuery, menuDismissed, session],
   );
-  const entries: MenuEntry[] = resuming
-    ? sessionMatches.map((past) => ({
-        key: past.sessionId,
-        name: past.title ?? "Untitled chat",
-        detail: past.updatedAt ? formatAge(past.updatedAt, Date.now()) : "",
-        mono: false,
-        typed: true,
-        pick: () => resume(past.sessionId),
-        fill: () => resume(past.sessionId),
-      }))
-    : matches.map((command) => ({
-        key: command.name,
-        name: `/${command.name}`,
-        detail: command.description ?? "",
-        mono: true,
-        typed: `/${command.name}`.toLowerCase().startsWith(text.toLowerCase()),
-        // A command that takes an argument waits for it; any other runs at once.
-        pick: () => (command.input ? complete(command) : submit(false, `/${command.name}`)),
-        fill: () => complete(command),
-      }));
+  const agentEntries: MenuEntry[] = agentMatches.map((choice) => ({
+    key: choice.id,
+    name: choice.name,
+    detail: choice.id === agent?.id ? "Current" : (choice.description ?? ""),
+    mono: false,
+    typed: true,
+    pick: () => switchAgent(choice.id),
+    fill: () => switchAgent(choice.id),
+  }));
+  const entries: MenuEntry[] = choosingAgent
+    ? agentEntries
+    : resuming
+      ? sessionMatches.map((past) => ({
+          key: past.sessionId,
+          name: past.title ?? "Untitled chat",
+          detail: past.updatedAt ? formatAge(past.updatedAt, Date.now()) : "",
+          mono: false,
+          typed: true,
+          pick: () => resume(past.sessionId),
+          fill: () => resume(past.sessionId),
+        }))
+      : matches.map((command) => ({
+          key: command.name,
+          name: `/${command.name}`,
+          detail: command.description ?? "",
+          mono: true,
+          typed: `/${command.name}`.toLowerCase().startsWith(text.toLowerCase()),
+          // A command that takes an argument waits for it; any other runs at once.
+          pick: () => (command.input ? complete(command) : submit(false, `/${command.name}`)),
+          fill: () => complete(command),
+        }));
   const active = entries[Math.min(selected, entries.length - 1)];
   const resumeTitle =
     !resuming || menuDismissed
@@ -166,6 +205,15 @@ export function Composer() {
           : resumeQuery.trim()
             ? "No chats match"
             : "No other chats in this folder";
+  const agentTitle =
+    !choosingAgent || menuDismissed
+      ? null
+      : agents === null
+        ? "Listing agents…"
+        : entries.length > 0
+          ? "Switch agent: a new chat starts on the one you pick"
+          : "No agents match";
+  const menuTitle = resumeTitle ?? agentTitle;
   const canSend = phase === "ready" && (text.trim() !== "" || images.length > 0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the height depends on the text
@@ -189,6 +237,10 @@ export function Composer() {
   useEffect(() => {
     if (resuming) actions.listSessions();
   }, [resuming, actions]);
+
+  useEffect(() => {
+    if (choosingAgent) actions.listAgents();
+  }, [choosingAgent, actions]);
 
   useEffect(() => {
     // The terminal delivers a key press and the character it types as separate events, so
@@ -218,11 +270,22 @@ export function Composer() {
     return () => window.removeEventListener("keydown", focusInput);
   }, []);
 
-  /** Sends the input, or queues it while Claude works unless `now` sends it into the turn. */
+  /** Sends the input, or queues it while the agent works unless `now` sends it into the turn. */
   function submit(now = false, value = text) {
-    if (phase !== "ready" || (value.trim() === "" && images.length === 0)) return;
     const command = value.trim();
-    if (command === "/resume") {
+    // Switching agents and quitting work while an agent cannot start, too.
+    if (command === "/agent") {
+      setText("/agent ");
+      setMenuDismissed(false);
+      return;
+    }
+    if (choosingAgent) return;
+    if (command === "/quit" || command === "/exit") {
+      actions.quit();
+      return;
+    }
+    if (phase !== "ready" || (value.trim() === "" && images.length === 0)) return;
+    if (command === "/resume" && canResume) {
       setText("/resume ");
       setMenuDismissed(false);
       return;
@@ -234,7 +297,6 @@ export function Composer() {
       return;
     }
     if (command === "/new" || command === "/clear") actions.newSession();
-    else if (command === "/quit" || command === "/exit") actions.quit();
     else if (command === "/patches") actions.setDrawing("patches");
     else if (command === "/tiles") actions.setDrawing("tiles");
     else if (command === "/zen") actions.toggleZen();
@@ -248,6 +310,12 @@ export function Composer() {
     setSelected(0);
   }
 
+  function switchAgent(agentId: string) {
+    actions.switchAgent(agentId);
+    setText("");
+    setSelected(0);
+  }
+
   function resume(sessionId: string) {
     actions.resume(sessionId);
     setText("");
@@ -255,6 +323,14 @@ export function Composer() {
   }
 
   function handleKey(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (auth && text === "" && /^[1-9]$/.test(event.key)) {
+      const method = auth.methods[Number(event.key) - 1];
+      if (method) {
+        event.preventDefault();
+        actions.authenticate(method.id);
+        return;
+      }
+    }
     if (pendingPermission && text === "" && /^[1-9]$/.test(event.key)) {
       const option = pendingPermission.options[Number(event.key) - 1];
       if (option) {
@@ -263,7 +339,7 @@ export function Composer() {
         return;
       }
     }
-    if (entries.length > 0 || resumeTitle !== null) {
+    if (entries.length > 0 || menuTitle !== null) {
       if ((event.key === "ArrowDown" || event.key === "ArrowUp") && entries.length > 0) {
         event.preventDefault();
         const step = event.key === "ArrowDown" ? 1 : -1;
@@ -363,9 +439,9 @@ export function Composer() {
           ))}
         </div>
       )}
-      {(entries.length > 0 || resumeTitle !== null) && (
-        <div className={`command-menu ${resuming ? "sessions" : ""}`}>
-          {resumeTitle !== null && <div className="menu-title">{resumeTitle}</div>}
+      {(entries.length > 0 || menuTitle !== null) && (
+        <div className={`command-menu ${picking ? "sessions" : ""}`}>
+          {menuTitle !== null && <div className="menu-title">{menuTitle}</div>}
           {entries.map((entry) => (
             <button
               type="button"
@@ -407,7 +483,11 @@ export function Composer() {
           rows={1}
           value={text}
           placeholder={
-            phase === "connecting" ? "Starting Claude…" : "Ask Claude anything — / for commands"
+            phase === "connecting"
+              ? `Starting ${agentName}…`
+              : phase === "auth"
+                ? `Sign in to ${agentName} above, or /agent to switch`
+                : `Ask ${agentName} anything — / for commands`
           }
           onChange={(event) => {
             setText(event.target.value);
@@ -427,6 +507,20 @@ export function Composer() {
               onClick={actions.toggleZen}
             >
               <Leaf size={13} /> Zen
+            </button>
+          )}
+          {agent && (
+            <button
+              type="button"
+              className="plain-chip agent-chip"
+              title="Switch agent (/agent)"
+              onClick={() => {
+                setText("/agent ");
+                setMenuDismissed(false);
+                input.current?.focus();
+              }}
+            >
+              <Bot size={13} /> {agent.name}
             </button>
           )}
           {session && (
