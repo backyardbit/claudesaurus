@@ -1,0 +1,59 @@
+{
+  "name": "claudesaurus",
+  "version": "0.1.0",
+  "description": "A graphical Claude Code chat for the Rex terminal, built on PixelGUI and ACP.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && node bin/claudesaurus.mjs",
+    "dev:ui": "vite",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check . && tsc --noEmit && vitest run",
+    "test": "vitest run",
+    "package": "node scripts/package.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "^0.110.0",
+    "@zenbu-labs/pixel": "^0.3.3",
+    "react": "18"
+  },
+  "devDependencies": {
+    "@agentclientprotocol/sdk": "^2.9.1",
+    "@biomejs/biome": "^2.6.8",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@types/hast": "^3.0.5",
+    "@types/node": "^26.6.6",
+    "@types/react": "18",
+    "@types/react-dom": "18",
+    "@vitejs/plugin-react": "^6.3.0",
+    "diff": "^9.0.0",
+    "esbuild": "^0.28.2",
+    "highlight.js": "^11.12.0",
+    "katex": "^0.16.47",
+    "lucide-react": "^1.78.0",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
+  },
+  "private": true,
+  "main": "dist/main.cjs",
+  "bin": {
+    "claudesaurus": "bin/claudesaurus.mjs"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@zenbu-labs/pixel@0.3.3": "patches/@zenbu-labs__pixel@0.3.3.patch"
+    }
+  }
+}

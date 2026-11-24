@@ -1,0 +1,30 @@
+diff --git a/dist/web/host.js b/dist/web/host.js
+index ec7ad4c629b02d984fed528ea9a56b955c7bee5b..ee20cfde279881bd39347bb98006f896b7ce5449 100644
+--- a/dist/web/host.js
++++ b/dist/web/host.js
+@@ -143,6 +143,25 @@ class PageHost {
+         electron_1.screen.on("display-metrics-changed", this.onDisplayChange);
+         this.window.webContents.on("paint", (event, dirtyRect, image) => {
+             const shmFrame = event.softwareFrame;
++            // Patched by claudesaurus. When Chromium composites without a GPU it can paint each
++            // frame twice: as a shared-memory frame, and as a bitmap of the whole surface that
++            // carries no scroll tree. Presenting the bitmap makes the engine redraw the whole
++            // pane, so a bitmap is held back and dropped when a shared frame follows it.
++            if (event.texture || shmFrame) {
++                this.sharedFrames = true;
++                clearTimeout(this.heldBitmap);
++            }
++            else if (this.sharedFrames) {
++                clearTimeout(this.heldBitmap);
++                this.heldBitmap = setTimeout(() => {
++                    if (this.stopped || !this.bitmaps.push(image, dirtyRect, true))
++                        return;
++                    this.wholeSurfaceNext = false;
++                    this.lastFrameSize = image.getSize();
++                    this.onFrameSubmitted?.();
++                }, 150);
++                return;
++            }
+             const size = event.texture
+                 ? {
+                     width: event.texture.textureInfo.codedSize.width,
