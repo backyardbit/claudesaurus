@@ -36,5 +36,27 @@
         "organizeImports": "on"
       }
     }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "src/pr/components/pullRequest/**",
+        "src/pr/components/ui/**",
+        "src/pr/components/diffs/**",
+        "src/pr/components/DiffWorkerPoolProvider.tsx",
+        "src/pr/components/DiffPanelShell.tsx",
+        "src/pr/lib/diffRendering.ts",
+        "src/pr/lib/diffFileContents.ts",
+        "src/pr/reviewCommentContext.ts"
+      ],
+      "linter": {
+        "enabled": false
+      }
+    }
+  ],
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   }
 }

@@ -153,12 +153,21 @@ export function Composer() {
   const auth = useAppState((state) => (state.phase === "auth" ? state.auth : null));
   const canResume = session?.features.resume ?? false;
   const agentName = agent?.name ?? "the agent";
+  const draft = useAppState((state) => state.draft);
 
   const [text, setText] = useState("");
   const [images, setImages] = useState<PromptImage[]>([]);
   const [selected, setSelected] = useState(0);
   const [menuDismissed, setMenuDismissed] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  // A task handed over by a PR viewer joins whatever is already typed rather than replacing it.
+  useEffect(() => {
+    if (draft === null) return;
+    const taken = actions.takeDraft();
+    if (taken === null) return;
+    setText((typed) => (typed.trim() === "" ? taken : `${typed.trimEnd()}\n\n${taken}`));
+    input.current?.focus();
+  }, [draft, actions]);
   /** When a key press was last handled as a command, so the character it types can be dropped. */
   const consumedKeyAt = useRef(Number.NEGATIVE_INFINITY);
 

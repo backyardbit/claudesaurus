@@ -1,14 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { createRoot, type WebViewProps } from "@zenbu-labs/pixel";
 import { z } from "zod";
 import { MAIN_CHANNEL, type MainMessage, UI_CHANNEL, type UiMessage } from "../shared/protocol";
 import { type Agent, createAgent, type ResumeTarget } from "./agent";
+import { createChatSocket } from "./chatSocket";
 import { startDebugCapture } from "./debug";
 import { agentChoices, openRexPane, prepareLaunch } from "./launch";
+import { openPage } from "./page";
 import { agentName, resolveAgentId } from "./registry";
 import { createReplayAgent } from "./replay";
+import { openPullRequestPane, rexBlock, takeDraftFile } from "./rexPanes";
 import { loadSettings, saveSettings } from "./settings";
 import { createStatusReporter } from "./status";
 import { SYSTEM_PROMPT_APPEND } from "./systemPrompt";
@@ -16,6 +18,8 @@ import { type ReadyUpdate, startAutoUpdater } from "./updater";
 import { createUsageStore } from "./usageStore";
 
 const cwd = process.cwd();
+
+const GITHUB_PULL_REQUEST_URL = /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/;
 
 /** Variables the pixel runtime sets for itself; the agent's shell commands must not inherit them. */
 const RUNTIME_ENV_PREFIXES = ["ELECTRON_", "PIXEL_", "CHROME_"];
@@ -39,6 +43,7 @@ const FlagsSchema = z.object({
   resume: optionalString,
   continue: z.boolean().optional().catch(undefined),
   agent: optionalString,
+  "draft-file": optionalString,
 });
 
 const { values } = parseArgs({
@@ -50,10 +55,20 @@ const { values } = parseArgs({
     resume: { type: "string" },
     continue: { type: "boolean" },
     agent: { type: "string" },
+    "draft-file": { type: "string" },
   },
   strict: false,
 });
 const flags = FlagsSchema.parse(values);
+
+/** A task the PR viewer left for this chat, put in the composer the first time the page loads. */
+let draft = takeDraftFile(flags["draft-file"]);
+
+/** Tasks from a PR viewer this chat opened, put in the composer as they arrive. */
+const chatSocket = createChatSocket((text) => {
+  if (pageReady) view.webContents.send(MAIN_CHANNEL, { type: "draft", text } satisfies MainMessage);
+  else draft = text;
+});
 
 /** Session settings given on the command line, by name. */
 function startupConfig() {
@@ -72,12 +87,6 @@ function resumeTarget(): ResumeTarget | null {
 }
 
 /**
- * The terminal font size, in CSS pixels, that the page's own type sizes were designed against.
- * The page is zoomed so its text keeps that proportion to the terminal's text on any display.
- */
-const DESIGN_TERMINAL_FONT_PX = 13;
-
-/**
  * Writes an escape sequence to the terminal beside the frames PixelGUI draws. One short write is
  * never mixed into another program's write, so it cannot land inside a frame.
  */
@@ -92,24 +101,10 @@ function writeToTerminal(sequence: string) {
 const status = createStatusReporter(writeToTerminal);
 const usageStore = createUsageStore();
 
-/** What Ctrl with a key does to the zoom: in, out, or back to the start. */
-function zoomStep(key: string) {
-  switch (key) {
-    case "=":
-    case "+":
-      return 1;
-    case "-":
-      return -1;
-    case "0":
-      return 0;
-    default:
-      return undefined;
-  }
-}
-
-const root = createRoot({
+const { root, view } = openPage({
   name: "Claudesaurus",
-  devtools: false,
+  html: path.join("ui", "index.html"),
+  onQuit: () => quit(),
   onResize(size) {
     debug?.note("resize", size);
   },
@@ -117,46 +112,7 @@ const root = createRoot({
     debug?.note("focus", focused);
     status.focus(focused);
   },
-  onKey(event) {
-    if (event.kind !== "press" || !event.mods.ctrl) return;
-    if (event.key === "q") {
-      quit();
-      return true;
-    }
-    const zoom = zoomStep(event.key);
-    if (zoom !== undefined) {
-      view.zoom(zoom);
-      return true;
-    }
-  },
 });
-
-/** The corner radius of a Rex pane, in points. */
-const REX_PANE_RADIUS_PT = 10;
-
-/**
- * Rex draws its panes with rounded corners, and a square page would cover them. In Rex the page
- * is rounded the same way, over a clear background, so the pane's own corners show.
- */
-const inRex = Boolean(process.env.REX_BLOCK);
-if (inRex) root.setClearColor([0, 0, 0, 0]);
-
-/**
- * loadFile's options leave out `style`, but it applies them after its own full-size style, so a
- * style given here is used. It replaces that one, so it repeats the full size.
- */
-const pageOptions: Omit<WebViewProps, "src" | "hidden" | "autoFocus"> = {
-  preload: path.join(__dirname, "preload.cjs"),
-  onOpenWindow: () => "deny",
-};
-if (inRex) {
-  pageOptions.style = {
-    width: "100%",
-    height: "100%",
-    cornerRadius: REX_PANE_RADIUS_PT * root.displayScale,
-  };
-}
-const view = root.loadFile(path.join(__dirname, "ui", "index.html"), pageOptions);
 
 const debugDirectory = process.env.CLAUDESAURUS_DEBUG_DIR;
 const debug = debugDirectory ? startDebugCapture(debugDirectory, view.webContents) : null;
@@ -334,6 +290,7 @@ const updater = autoUpdateEnabled
 function quit() {
   updater?.stop();
   debug?.stop();
+  chatSocket.close();
   usageStore.flush();
   status.clear();
   agent.dispose();
@@ -360,6 +317,29 @@ function restart() {
   quit();
 }
 
+function toast(text: string) {
+  view.webContents.send(MAIN_CHANNEL, { type: "toast", text } satisfies MainMessage);
+}
+
+/**
+ * Following a link from the chat. A pull request opens in a viewer beside the chat when there is
+ * Rex to split; anything else is copied, since the page cannot open a browser on the computer
+ * the terminal runs on.
+ */
+async function openLink(url: string) {
+  if (rexBlock && GITHUB_PULL_REQUEST_URL.test(url)) {
+    try {
+      await openPullRequestPane(url, cwd, chatSocket.path());
+      toast("Opened the pull request");
+      return;
+    } catch (error) {
+      debug?.note("openPullRequestPane", String(error));
+    }
+  }
+  root.setClipboard(url);
+  toast("Link copied");
+}
+
 view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
   // A frame inside the page, such as an html block, must not be able to send prompts or answer
   // permission requests, even if it reaches the channel.
@@ -373,6 +353,10 @@ view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
           type: "updateReady",
           version: readyUpdate.version,
         } satisfies MainMessage);
+      }
+      if (draft !== null) {
+        view.webContents.send(MAIN_CHANNEL, { type: "draft", text: draft } satisfies MainMessage);
+        draft = null;
       }
       for (const earlier of history) view.webContents.send(MAIN_CHANNEL, earlier);
       break;
@@ -427,7 +411,7 @@ view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
       root.setClipboard(message.text);
       break;
     case "openLink":
-      root.setClipboard(message.url);
+      void openLink(message.url);
       break;
     case "restart":
       restart();
@@ -445,9 +429,5 @@ view.webContents.on("did-start-navigation", (details) => {
 });
 
 view.webContents.on("did-finish-load", () => {
-  // The terminal's font size is in device pixels. Where the page is already drawn at the
-  // display's scale, as on a Retina Mac, only the rest of the difference is zoom.
-  const terminalFontPx = root.info.basePx / root.displayScale;
-  view.webContents.setZoomFactor(terminalFontPx / DESIGN_TERMINAL_FONT_PX);
   debug?.note("info", { ...root.info, displayScale: root.displayScale });
 });

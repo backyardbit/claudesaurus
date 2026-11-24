@@ -19,9 +19,17 @@ await esbuild({
 
 await esbuild({
   ...node,
+  entryPoints: ["src/main/prViewer.ts"],
+  outfile: "dist/pr.cjs",
+  external: ["electron", "@zenbu-labs/pixel"],
+});
+
+await esbuild({
+  ...node,
   entryPoints: ["src/preload/preload.ts"],
   outfile: "dist/preload.cjs",
   external: ["electron"],
 });
 
 await vite();
+await vite({ configFile: "vite.pr.config.mts" });

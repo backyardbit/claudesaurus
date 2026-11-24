@@ -12,7 +12,8 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client"],
+    "paths": { "~/*": ["./src/pr/*"] }
   },
-  "include": ["src", "scripts", "bin", "vite.config.mts", "vitest.config.mts"]
+  "include": ["src", "scripts", "bin", "vite.config.mts", "vite.pr.config.mts", "vitest.config.mts"]
 }
