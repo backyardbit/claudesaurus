@@ -79,10 +79,13 @@ export function App() {
     follow();
   }, [items, permissions, running]);
 
+  // The column grows with new content and reflows when the pane's width changes; the view itself
+  // gets shorter when the pane does, which would leave the newest lines under the composer.
   useEffect(() => {
-    if (!column.current) return;
+    if (!column.current || !scroller.current) return;
     const observer = new ResizeObserver(follow);
     observer.observe(column.current);
+    observer.observe(scroller.current);
     return () => observer.disconnect();
   }, [follow]);
 

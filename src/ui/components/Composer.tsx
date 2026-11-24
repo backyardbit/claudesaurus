@@ -94,6 +94,14 @@ function readImage(file: File) {
   });
 }
 
+/** Makes the input as tall as its text, and scrollable past the height the styles allow. */
+function fitInput(element: HTMLTextAreaElement | null) {
+  if (!element) return;
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
+  element.style.overflowY = element.scrollHeight > element.clientHeight + 1 ? "auto" : "hidden";
+}
+
 export function Composer() {
   const actions = useActions();
   const phase = useAppState((state) => state.phase);
@@ -161,13 +169,21 @@ export function Composer() {
   const canSend = phase === "ready" && (text.trim() !== "" || images.length > 0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the height depends on the text
-  useLayoutEffect(() => {
+  useLayoutEffect(() => fitInput(input.current), [text]);
+
+  // A narrower pane wraps the same text onto more lines.
+  useEffect(() => {
     const element = input.current;
     if (!element) return;
-    element.style.height = "auto";
-    element.style.height = `${element.scrollHeight}px`;
-    element.style.overflowY = element.scrollHeight > element.clientHeight + 1 ? "auto" : "hidden";
-  }, [text]);
+    let width = element.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (element.clientWidth === width) return;
+      width = element.clientWidth;
+      fitInput(element);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   // Lists the sessions anew each time `/resume` is typed, so a chat from just now is there.
   useEffect(() => {
