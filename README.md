@@ -7,6 +7,10 @@ bubbles, tool cards, diffs, permission prompts, and a composer with model, effor
 mode chips. Markdown, LaTeX and HTML (scripts included) render for real, because the chat is a web
 page drawn into the terminal.
 
+Claude is the default. `/agent` switches the chat to another agent from the
+[ACP registry](https://agentclientprotocol.com/registry), such as OpenAI Codex, xAI Grok or Google
+Antigravity (see [Other agents](#other-agents)).
+
 ## How it works
 
 ```
@@ -26,6 +30,8 @@ Rex pane  <-- Kitty graphics --  PixelGUI (Chromium, off screen)  -- chat page (
   official SDK, and relays messages to the page (`src/shared/protocol.ts`).
 
 Claude Code runs with your normal setup: login, settings, `CLAUDE.md`, hooks, MCP servers, skills.
+Other agents are started the same way, from the ACP registry (`src/main/registry.ts`,
+`src/main/launch.ts`).
 
 ## Install
 
@@ -67,6 +73,7 @@ claudesaurus --model opus --effort high       # start with these settings
 claudesaurus --mode plan                      # default, acceptEdits, plan, auto, bypassPermissions
 claudesaurus --continue                       # reopen the latest session in this directory
 claudesaurus --resume SESSION_ID              # reopen a session, including one from the claude CLI
+claudesaurus --agent codex                    # chat with another agent for this run
 claudesaurus --remove-rex-actions             # take the split actions out of Rex's palette
 ```
 
@@ -80,6 +87,7 @@ start whichever install ran last, a Homebrew one or a source checkout.
 
 Every session adds a note to Claude's system prompt (`src/main/systemPrompt.ts`) saying what the
 chat can draw, so Claude answers "show me" with an inline `html` block instead of writing a file.
+An agent that takes no system prompt gets the note with the session's first message instead.
 
 A Markdown image of a video file, `![demo](/abs/path/demo.mp4)`, is shown as a player, so Claude
 can show you a recording it made. It plays MP4 and MOV (H.264, HEVC, AV1) and WebM (VP8, VP9,
@@ -88,13 +96,16 @@ drawn again in the terminal.
 
 | Key                      | Does                                                       |
 | ------------------------ | ---------------------------------------------------------- |
-| Enter                    | Send. While Claude works, the message is queued            |
-| Ctrl+Enter               | Send now, into Claude's running turn; or the first queued  |
+| Enter                    | Send. While the agent works, the message is queued         |
+| Ctrl+Enter               | Send now, into the agent's running turn; or the first      |
+|                          | queued. An agent that cannot take it mid-turn gets it next |
 | Shift+Enter              | New line                                                   |
 | Esc                      | Stop Claude                                                |
 | `/`                      | Slash commands. `/new` or `/clear` starts a new chat,      |
 |                          | `/quit` closes. Enter runs the picked one, Tab fills it in |
 | `/resume`                | Pick a past chat from this directory; type to filter       |
+| `/agent`                 | Switch to another agent, starting a new chat; type to      |
+|                          | filter. Kept for later runs                                |
 | `/patches`, `/tiles`     | Choose how frames are drawn (see Performance)              |
 | `/zen`                   | Show only the conversation: hide tool calls, thoughts,     |
 |                          | notices and the plan; again shows them. Kept for later     |
@@ -106,19 +117,56 @@ drawn again in the terminal.
 
 Clicking a link copies its address, since the page cannot open a browser on your computer.
 
+## Other agents
+
+`/agent` lists Claude and every agent in the [ACP registry](https://agentclientprotocol.com/registry)
+that runs on this computer, Codex, Grok and Antigravity first. Picking one starts a new chat with
+it, and later runs start with it too; `--agent NAME` picks one for a single run. `NAME` is
+`claude`, `codex`, `grok`, `antigravity` or a registry id. The composer shows the agent in a chip,
+which opens the list.
+
+Claude runs from the adapter that ships with Claudesaurus and needs no network. For any other
+agent, Claudesaurus reads the registry's index, which it keeps in `~/.cache/claudesaurus/` for
+when the network is down, and starts the agent as the registry says:
+
+- An npm or PyPI package runs with `npx` or `uvx`, which download it the first time.
+- A binary release is downloaded once into `~/.cache/claudesaurus/agents/ID/VERSION/`, checked
+  against the registry's SHA-256, and unpacked with the system's `unzip` or `tar`, which keep
+  its symlinks. Antigravity's is about 100 MB to download and 300 MB unpacked.
+
+The pane shows the progress while an agent downloads and starts. Each agent uses its own login
+and settings (`~/.codex`, `~/.grok`, `~/.gemini`). An agent that needs a sign-in first shows its
+ways to sign in: one the agent does itself, usually in the browser, starts when picked; one done
+in a terminal opens a Rex pane below that runs the agent's login, and the chat carries on when it
+finishes. Outside Rex the card shows the command to run instead.
+
+What each agent can do differs, and the page follows what the agent says it supports:
+
+| Agent       | `/resume`, `--continue` | Ctrl+Enter mid-turn | Note on what the chat draws | Sign-in                |
+| ----------- | ----------------------- | ------------------- | --------------------------- | ---------------------- |
+| Claude      | yes                     | yes                 | system prompt               | Claude Code's login    |
+| Codex       | yes                     | yes                 | system prompt               | ChatGPT or API key     |
+| Grok        | yes                     | queued for next     | first message               | Grok, in the browser   |
+| Antigravity | yes                     | queued for next     | first message               | Google, in the browser |
+
+`--model`, `--effort` and `--mode` apply to the agent the app starts with, matched to its own
+settings by id or kind; one it has no setting for is skipped with a note.
+
 ## Status and notifications
 
-Claudesaurus reports what Claude is doing to the terminal with the
+Claudesaurus reports what the agent is doing to the terminal with the
 [Program Status Protocol](https://www.superlogical.com/rex/docs/build/program-status) (OSC 7501),
-which Rex shows on tabs and in its session picker (`src/main/status.ts`):
+which Rex shows on tabs and in its session picker (`src/main/status.ts`). It reports under the
+agent's own program name, so Rex shows its icon: `claude-code` for Claude, `codex`, `grok-build`,
+`agy` for Antigravity, and the registry id for an agent Rex does not know.
 
-| State     | When                                                          |
-| --------- | ------------------------------------------------------------- |
-| `working` | A turn is running. The message names the tool Claude is using |
-| `blocked` | A permission prompt is waiting (`kind=permission`)            |
-| `done`    | A turn finished while the pane was not focused                |
-| `idle`    | Waiting for you, or you stopped the turn                      |
-| `error`   | The turn or the Claude adapter failed                         |
+| State     | When                                                             |
+| --------- | ---------------------------------------------------------------- |
+| `working` | A turn is running. The message names the tool the agent is using |
+| `blocked` | A permission prompt is waiting (`kind=permission`)               |
+| `done`    | A turn finished while the pane was not focused                   |
+| `idle`    | Waiting for you, or you stopped the turn                         |
+| `error`   | The turn or the agent failed                                     |
 
 When a turn finishes, fails or needs permission while the pane is not focused, it also sends a
 desktop notification (OSC 777). `rex block call -b BLOCK program_status` shows the current record.

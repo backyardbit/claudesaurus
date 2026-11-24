@@ -317,7 +317,8 @@ export function createMockBridge(): Bridge {
       session: {
         sessionId: "mock",
         cwd: "/home/you/work/my-app",
-        agentName: "Claude Agent",
+        agent: { id: "claude-acp", name: "Claude" },
+        features: { resume: true, steer: true, systemPrompt: true, embeddedContext: true },
         agentVersion: "mock",
         configOptions,
         loadingHistory: false,

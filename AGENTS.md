@@ -72,4 +72,6 @@ to `~/.local/state/claudesaurus/restart.log`.
 
 New UI joins the existing visual language: the theme variables at the top of
 `src/ui/styles.css`, pill-shaped `.chip`s, and `Popover` for anything that opens. Claudesaurus
-reports itself to terminals as `claude-code` on purpose, since it is a front end for Claude Code.
+reports itself to terminals as the agent it is running, on purpose, so Rex shows that agent's
+icon: `claude-code` for Claude, the CLI's own name for the agents Rex knows (`codex`,
+`grok-build`, `agy`, …), and the registry id for any other (`statusApp` in `src/main/status.ts`).

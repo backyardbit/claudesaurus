@@ -35,11 +35,12 @@ function Ring({ fraction }: { fraction: number | null }) {
 }
 
 /**
- * How full Claude's context is, as a ring in the composer that opens the figures. The figures
- * are unknown until Claude reports them in a turn.
+ * How full the agent's context is, as a ring in the composer that opens the figures. The figures
+ * are unknown until the agent reports them in a turn.
  */
 export function ContextChip() {
   const usage = useAppState((state) => state.usage);
+  const agentName = useAppState((state) => state.agent?.name ?? "the agent");
   const [open, setOpen] = useState(false);
   const known = usage !== null && usage.size > 0;
   const fraction = known ? Math.min(1, usage.used / usage.size) : null;
@@ -85,7 +86,7 @@ export function ContextChip() {
             </span>
           </div>
         ) : (
-          <div className="context-figures">Shows after Claude's next reply</div>
+          <div className="context-figures">Shows after {agentName}'s next reply</div>
         )}
       </div>
     </Popover>

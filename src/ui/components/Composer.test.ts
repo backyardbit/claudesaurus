@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import type { PastSession } from "../../shared/protocol";
+import type { AgentChoice, PastSession } from "../../shared/protocol";
 import { formatAge } from "../format";
-import { matchSessions } from "./Composer";
+import { matchAgents, matchCommands, matchSessions } from "./Composer";
 
 const sessions: PastSession[] = [
   { sessionId: "aaaa-1", title: "Fix the scroll jump", updatedAt: "2026-11-23T10:00:00Z" },
@@ -32,4 +32,25 @@ test("says how long ago in the largest whole unit", () => {
   expect(formatAge("2026-11-24T09:00:00Z", now)).toBe("3h ago");
   expect(formatAge("2026-11-20T12:00:00Z", now)).toBe("4d ago");
   expect(formatAge("not a date", now)).toBe("");
+});
+
+test("finds agents by name, id or description", () => {
+  const agents: AgentChoice[] = [
+    { id: "claude-acp", name: "Claude", version: "1", description: "Anthropic's Claude Code" },
+    { id: "codex-acp", name: "Codex", version: "2", description: "OpenAI's coding assistant" },
+    { id: "grok-build", name: "Grok Build", version: "1", description: null },
+  ];
+  const names = (query: string) => matchAgents(agents, query).map((agent) => agent.id);
+  expect(names("")).toEqual(["claude-acp", "codex-acp", "grok-build"]);
+  expect(names("GROK")).toEqual(["grok-build"]);
+  expect(names("openai")).toEqual(["codex-acp"]);
+  expect(names("acp")).toEqual(["claude-acp", "codex-acp"]);
+});
+
+test("offers /resume only to an agent that can reopen sessions", () => {
+  const names = (canResume: boolean) =>
+    matchCommands([], "/res", canResume).map((command) => command.name);
+  expect(names(true)).toContain("resume");
+  expect(names(false)).not.toContain("resume");
+  expect(matchCommands([], "/age", false).map((command) => command.name)).toEqual(["agent"]);
 });

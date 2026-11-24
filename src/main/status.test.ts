@@ -6,6 +6,7 @@ import {
   encodeNotification,
   encodeStatus,
   type StatusReport,
+  statusApp,
 } from "./status";
 
 const PREFIX = "\x1b]7501;";
@@ -45,7 +46,8 @@ const session: MainMessage = {
   session: {
     sessionId: "s",
     cwd: "/w",
-    agentName: "Claude",
+    agent: { id: "claude-acp", name: "Claude" },
+    features: { resume: true, steer: true, systemPrompt: true, embeddedContext: true },
     agentVersion: "1",
     configOptions: [],
     loadingHistory: false,
@@ -155,4 +157,38 @@ test("clearing removes the records", () => {
   status.clear();
   expect(CLEAR_STATUS).toBe("\x1b]7501;state=clear\x1b\\");
   expect(states()).toEqual([{ state: "clear" }]);
+});
+
+test("reports each agent under the program name Rex knows it by", () => {
+  expect(statusApp("claude-acp")).toBe("claude-code");
+  expect(statusApp("codex-acp")).toBe("codex");
+  expect(statusApp("grok-build")).toBe("grok-build");
+  expect(statusApp("antigravity-acp")).toBe("agy");
+  expect(statusApp("gemini")).toBe("gemini");
+  expect(statusApp("cursor")).toBe("cursor-agent");
+  expect(statusApp("opencode")).toBe("opencode");
+  expect(statusApp("goose")).toBe("goose");
+  expect(statusApp("an-agent-id-far-too-long-for-the-protocol")).toBe("claude-code");
+  expect(statusApp("bad:id")).toBe("claude-code");
+});
+
+test("switching agents reports the new agent, idle until it works", () => {
+  const { status, states } = reporter();
+  status.observe(session);
+  status.observe(prompt);
+  status.observe({
+    type: "connecting",
+    agent: { id: "antigravity-acp", name: "Antigravity" },
+    detail: null,
+  });
+  status.observe({
+    type: "connecting",
+    agent: { id: "antigravity-acp", name: "Antigravity" },
+    detail: "Starting…",
+  });
+  expect(states().map(({ state, app }) => `${state} ${app}`)).toEqual([
+    "idle claude-code",
+    "working claude-code",
+    "idle agy",
+  ]);
 });

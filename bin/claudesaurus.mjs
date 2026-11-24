@@ -13,6 +13,8 @@ Opens a graphical Claude Code chat in this terminal pane, working in the current
 The terminal must draw images with the Kitty graphics protocol, as Rex, Ghostty and kitty do.
 
 options:
+  --agent NAME       chat with another agent from the ACP registry for this run: codex, grok,
+                     antigravity, or a registry id. /agent in the chat switches for good
   --model NAME       start with this model, such as opus, sonnet or haiku
   --effort LEVEL     start with this effort: low, medium, high, xhigh or max
   --mode MODE        start in this permission mode: default, acceptEdits, plan, auto or
@@ -29,6 +31,7 @@ examples:
   claudesaurus
   claudesaurus --model opus --effort high
   claudesaurus --continue
+  claudesaurus --agent codex
 `;
 
 const appRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");

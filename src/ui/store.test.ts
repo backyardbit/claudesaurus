@@ -21,7 +21,8 @@ function session(loadingHistory: boolean): MainMessage {
     session: {
       sessionId: "s",
       cwd: "/w",
-      agentName: "Claude",
+      agent: { id: "claude-acp", name: "Claude" },
+      features: { resume: true, steer: true, systemPrompt: true, embeddedContext: true },
       agentVersion: "1",
       configOptions: [],
       loadingHistory,
@@ -194,4 +195,54 @@ test("tracks pending permission requests", () => {
 test("zen mode outlasts a new session", () => {
   const state = play([{ type: "zen", zen: true }, session(false)]);
   expect(state.zen).toBe(true);
+});
+
+test("another agent starting clears everything, and its progress only updates the detail", () => {
+  const codex = { id: "codex-acp", name: "Codex" };
+  const started = play([session(false), text("agent_message_chunk", "Hi")]);
+  const switching = play(
+    [
+      { type: "connecting", agent: codex, detail: null },
+      { type: "connecting", agent: codex, detail: "Starting Codex…" },
+    ],
+    started,
+  );
+  expect(switching).toMatchObject({
+    phase: "connecting",
+    agent: codex,
+    connectingDetail: "Starting Codex…",
+    items: [],
+    session: null,
+  });
+});
+
+test("an agent that needs a sign-in waits for it, and its session ends the wait", () => {
+  const grok = { id: "grok-build", name: "Grok Build" };
+  const auth = {
+    methods: [{ id: "grok.com", name: "Grok", description: null, kind: "agent" as const }],
+    status: null,
+    command: null,
+  };
+  const waiting = play([
+    { type: "connecting", agent: grok, detail: null },
+    { type: "auth", auth },
+  ]);
+  expect(waiting).toMatchObject({ phase: "auth", auth, agent: grok });
+  const signedIn = play([session(false)], waiting);
+  expect(signedIn).toMatchObject({ phase: "ready", auth: null, agent: { id: "claude-acp" } });
+});
+
+test("switching agents clears the previous agent's errors", () => {
+  const antigravity = { id: "antigravity-acp", name: "Google Antigravity" };
+  const failed = play([
+    session(false),
+    { type: "error", fatal: false, message: "Could not change model: no haiku here" },
+  ]);
+  expect(failed.items).toMatchObject([{ kind: "error" }]);
+  const switched = play([{ type: "connecting", agent: antigravity, detail: null }], failed);
+  expect(switched.items).toEqual([]);
+  // Switching to the agent already running starts afresh too.
+  const claude = { id: "claude-acp", name: "Claude" };
+  const again = play([{ type: "connecting", agent: claude, detail: null }], failed);
+  expect(again.items).toEqual([]);
 });
