@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@zenbu-labs/pixel@0.3.3':
-    hash: gr4kc42mzoz7mr4urejkhzoj2u
+    hash: lw2gelmubbxzbxgn24xdi2mh6m
     path: patches/@zenbu-labs__pixel@0.3.3.patch
 
 importers:
@@ -18,7 +18,7 @@ importers:
         version: 0.110.0(@anthropic-ai/sdk@1.13.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(zod@4.6.7))
       '@zenbu-labs/pixel':
         specifier: ^0.3.3
-        version: 0.3.3(patch_hash=gr4kc42mzoz7mr4urejkhzoj2u)(react@18.3.1)
+        version: 0.3.3(patch_hash=lw2gelmubbxzbxgn24xdi2mh6m)(react@18.3.1)
       react:
         specifier: '18'
         version: 18.3.1
@@ -2461,7 +2461,7 @@ snapshots:
   '@zenbu-labs/pixel-native-linux-x64@0.3.3':
     optional: true
 
-  '@zenbu-labs/pixel@0.3.3(patch_hash=gr4kc42mzoz7mr4urejkhzoj2u)(react@18.3.1)':
+  '@zenbu-labs/pixel@0.3.3(patch_hash=lw2gelmubbxzbxgn24xdi2mh6m)(react@18.3.1)':
     dependencies:
       react: 18.3.1
       react-reconciler: 0.29.2(react@18.3.1)

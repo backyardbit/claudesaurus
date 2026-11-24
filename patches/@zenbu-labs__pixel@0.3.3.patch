@@ -1,8 +1,16 @@
 diff --git a/dist/web/host.js b/dist/web/host.js
-index ec7ad4c629b02d984fed528ea9a56b955c7bee5b..ee20cfde279881bd39347bb98006f896b7ce5449 100644
+index ec7ad4c629b02d984fed528ea9a56b955c7bee5b..2133214b9c9b8c04f647f7430832ba9b8495ad2c 100644
 --- a/dist/web/host.js
 +++ b/dist/web/host.js
-@@ -143,6 +143,25 @@ class PageHost {
+@@ -52,6 +52,7 @@ function windowOptions(passthrough, size, offscreen) {
+         },
+     };
+ }
++const RESIZE_INTERVAL_MS = 100;
+ class PageHost {
+     surface;
+     popupSurface;
+@@ -143,6 +144,28 @@ class PageHost {
          electron_1.screen.on("display-metrics-changed", this.onDisplayChange);
          this.window.webContents.on("paint", (event, dirtyRect, image) => {
              const shmFrame = event.softwareFrame;
@@ -17,7 +25,10 @@ index ec7ad4c629b02d984fed528ea9a56b955c7bee5b..ee20cfde279881bd39347bb98006f896
 +            else if (this.sharedFrames) {
 +                clearTimeout(this.heldBitmap);
 +                this.heldBitmap = setTimeout(() => {
-+                    if (this.stopped || !this.bitmaps.push(image, dirtyRect, true))
++                    if (this.stopped)
++                        return;
++                    this.announceFrameSize(image.getSize());
++                    if (!this.bitmaps.push(image, dirtyRect, true))
 +                        return;
 +                    this.wholeSurfaceNext = false;
 +                    this.lastFrameSize = image.getSize();
@@ -28,3 +39,98 @@ index ec7ad4c629b02d984fed528ea9a56b955c7bee5b..ee20cfde279881bd39347bb98006f896
              const size = event.texture
                  ? {
                      width: event.texture.textureInfo.codedSize.width,
+@@ -154,6 +177,7 @@ class PageHost {
+                         height: shmFrame.frameInfo.contentRect.height,
+                     }
+                     : image.getSize();
++            this.announceFrameSize(size);
+             const presented = event.texture || shmFrame
+                 ? (0, paint_1.presentPaint)(this.surface, event.texture, shmFrame, image, dirtyRect, this.wholeSurfaceNext)
+                 : this.bitmaps.push(image, dirtyRect, this.wholeSurfaceNext);
+@@ -225,6 +249,36 @@ class PageHost {
+         this.window.webContents.setAudioMuted(muted);
+         this.updateState({ muted });
+     }
++    // Patched by claudesaurus. A drag that resizes the pane sends a new size every few
++    // milliseconds, and each one makes Chromium lay out and paint the whole page again, which the
++    // engine sends as a whole new frame. The page takes a new size at once, then at most once per
++    // RESIZE_INTERVAL_MS, and the last size always lands when the interval ends.
++    resizeTimer = null;
++    resizePending = false;
++    applyContentSize() {
++        if (this.resizeTimer) {
++            this.resizePending = true;
++            return;
++        }
++        const size = this.contentSize(this.layout);
++        this.window.setContentSize(size.width, size.height, false);
++        this.resizeTimer = setTimeout(() => {
++            this.resizeTimer = null;
++            if (!this.resizePending || this.stopped)
++                return;
++            this.resizePending = false;
++            this.applyContentSize();
++        }, RESIZE_INTERVAL_MS);
++    }
++    // Patched by claudesaurus. The engine draws the page's surface into its box, and resamples it
++    // when the two differ in size, which squashes or stretches the whole page. The box keeps the
++    // size of the frame on show, and takes a new frame's size just before that frame is presented.
++    onFrameSize = null;
++    announceFrameSize(size) {
++        if (this.lastFrameSize?.width === size.width && this.lastFrameSize?.height === size.height)
++            return;
++        this.onFrameSize?.(size);
++    }
+     resize(layout, options) {
+         if (this.stopped)
+             return;
+@@ -244,8 +298,7 @@ class PageHost {
+             return;
+         if (!options?.keepFrame)
+             this.surface.clear();
+-        const size = this.contentSize(layout);
+-        this.window.setContentSize(size.width, size.height, false);
++        this.applyContentSize();
+     }
+     navigate(url) {
+         void this.window.webContents.loadURL(url);
+@@ -445,6 +498,7 @@ class PageHost {
+         this.window.destroy();
+     }
+     teardown() {
++        clearTimeout(this.resizeTimer);
+         for (const popup of [...this.popups])
+             popup.close();
+         this.devtools?.close();
+diff --git a/dist/webview.js b/dist/webview.js
+index f10817bea090b8970f7ca568bfbd646904416a15..a94a37bbc762f9bb692f0f7faf5a3e4bff232fa3 100644
+--- a/dist/webview.js
++++ b/dist/webview.js
+@@ -44,6 +44,8 @@ exports.WebView = (0, react_1.forwardRef)(function WebView(props, ref) {
+     const frameListeners = (0, react_1.useRef)(new Set());
+     const changeListeners = (0, react_1.useRef)(new Set());
+     const [popup, setPopup] = (0, react_1.useState)(null);
++    // Patched by claudesaurus: the size of the frame on show (see PageHost.announceFrameSize).
++    const [frameSize, setFrameSize] = (0, react_1.useState)(null);
+     const [pointerShapes, setPointerShapes] = (0, react_1.useState)({
+         page: "default",
+         devtools: "default",
+@@ -190,6 +192,7 @@ exports.WebView = (0, react_1.forwardRef)(function WebView(props, ref) {
+             check: (check) => propsRef.current.onPermissionCheck?.(check) ?? false,
+         };
+         host.onQuit = () => registry.quit(entry);
++        host.onFrameSize = (size) => registry.root.flushSync(() => setFrameSize(size));
+         host.onFrameSubmitted = () => {
+             for (const listener of frameListeners.current)
+                 listener();
+@@ -428,8 +431,8 @@ exports.WebView = (0, react_1.forwardRef)(function WebView(props, ref) {
+     return ((0, jsx_runtime_1.jsxs)(react_2.Box, { ref: boxRef, style: { ...props.style, overflow: "hidden" }, children: [page && ((0, jsx_runtime_1.jsx)(react_2.Box, { surface: surfaces.current?.page, style: {
+                     position: "absolute",
+                     inset: { top: page.y, left: page.x },
+-                    width: page.width,
+-                    height: page.height,
++                    width: frameSize?.width ?? page.width,
++                    height: frameSize?.height ?? page.height,
+                     cornerRadius: props.style?.cornerRadius,
+                     background: props.browserWindowOptions?.transparent ? undefined : theme.bg,
+                     opaque: !props.browserWindowOptions?.transparent,
