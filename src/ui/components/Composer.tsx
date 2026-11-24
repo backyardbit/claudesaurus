@@ -21,6 +21,7 @@ const MAX_SESSIONS = 10;
 /** Commands the page answers itself, listed ahead of Claude's own. */
 const LOCAL_COMMANDS: AvailableCommand[] = [
   { name: "new", description: "Start a new chat" },
+  { name: "clear", description: "Start a new chat, as /new does" },
   { name: "resume", description: "Open a past chat from this folder" },
   { name: "patches", description: "Draw only the areas that change: much less data to send" },
   { name: "tiles", description: "Draw in tiles, PixelGUI's usual way in Rex" },
@@ -34,8 +35,20 @@ const RESUME_PATTERN = /^\/resume\s+(.*)$/s;
 
 const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A row of the menu above the composer: a command to complete, or a session to open. */
-type MenuEntry = { key: string; name: string; detail: string; mono: boolean; pick(): void };
+/**
+ * A row of the menu above the composer: a command, or a session to open. Enter and a click
+ * `pick` it; Tab only `fill`s a command into the input, as in Claude Code.
+ */
+type MenuEntry = {
+  key: string;
+  name: string;
+  detail: string;
+  mono: boolean;
+  /** Whether the input is the start of this row, so Enter means it and not the text as typed. */
+  typed: boolean;
+  pick(): void;
+  fill(): void;
+};
 
 /** How a typed character reaches the input, as opposed to a paste or a drop. */
 const TYPED_INPUT = new Set(["insertText", "insertLineBreak", "insertParagraph"]);
@@ -118,14 +131,19 @@ export function Composer() {
         name: past.title ?? "Untitled chat",
         detail: past.updatedAt ? formatAge(past.updatedAt, Date.now()) : "",
         mono: false,
+        typed: true,
         pick: () => resume(past.sessionId),
+        fill: () => resume(past.sessionId),
       }))
     : matches.map((command) => ({
         key: command.name,
         name: `/${command.name}`,
         detail: command.description ?? "",
         mono: true,
-        pick: () => complete(command),
+        typed: `/${command.name}`.toLowerCase().startsWith(text.toLowerCase()),
+        // A command that takes an argument waits for it; any other runs at once.
+        pick: () => (command.input ? complete(command) : submit(false, `/${command.name}`)),
+        fill: () => complete(command),
       }));
   const active = entries[Math.min(selected, entries.length - 1)];
   const resumeTitle =
@@ -183,9 +201,9 @@ export function Composer() {
   }, []);
 
   /** Sends the input, or queues it while Claude works unless `now` sends it into the turn. */
-  function submit(now = false) {
-    if (!canSend) return;
-    const command = text.trim();
+  function submit(now = false, value = text) {
+    if (phase !== "ready" || (value.trim() === "" && images.length === 0)) return;
+    const command = value.trim();
     if (command === "/resume") {
       setText("/resume ");
       setMenuDismissed(false);
@@ -233,7 +251,14 @@ export function Composer() {
         setSelected((selected + step + entries.length) % entries.length);
         return;
       }
-      if ((event.key === "Tab" || event.key === "Enter") && active) {
+      if (event.key === "Tab" && active) {
+        event.preventDefault();
+        active.fill();
+        return;
+      }
+      // A row whose name only contains the input, rather than starting with it, waits for an
+      // arrow key; until then Enter sends the text as typed.
+      if (event.key === "Enter" && !event.shiftKey && active && (active.typed || selected > 0)) {
         event.preventDefault();
         active.pick();
         return;

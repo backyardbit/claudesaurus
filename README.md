@@ -86,7 +86,8 @@ chat can draw, so Claude answers "show me" with an inline `html` block instead o
 | Ctrl+Enter               | Send now, into Claude's running turn; or the first queued  |
 | Shift+Enter              | New line                                                   |
 | Esc                      | Stop Claude                                                |
-| `/`                      | Slash commands. `/new` starts a new chat, `/quit` closes   |
+| `/`                      | Slash commands. `/new` or `/clear` starts a new chat,      |
+|                          | `/quit` closes. Enter runs the picked one, Tab fills it in |
 | `/resume`                | Pick a past chat from this directory; type to filter       |
 | `/patches`, `/tiles`     | Choose how frames are drawn (see Performance)              |
 | 1–9                      | Answer a permission prompt (with an empty input)           |
