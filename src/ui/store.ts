@@ -95,6 +95,8 @@ export type State = {
   pastSessions: PastSession[] | null;
   /** True while a past session's conversation is being replayed into the page. */
   replaying: boolean;
+  /** `/zen`: the conversation shows only what was said, without tool calls and thoughts. */
+  zen: boolean;
   toast: string | null;
 };
 
@@ -114,6 +116,7 @@ export const initialState: State = {
   commands: [],
   pastSessions: null,
   replaying: false,
+  zen: false,
   toast: null,
 };
 
@@ -354,10 +357,13 @@ export function reduce(state: State, message: MainMessage, now: number): State {
         session: message.session,
         configOptions: message.session.configOptions,
         commands: state.commands,
+        zen: state.zen,
         replaying: message.session.loadingHistory,
       };
     case "historyLoaded":
       return { ...state, replaying: false };
+    case "zen":
+      return { ...state, zen: message.zen };
     case "sessions":
       return { ...state, pastSessions: message.sessions };
     case "account":
@@ -497,6 +503,12 @@ export function createStore(bridge: Bridge) {
     setDrawing(drawing: Drawing) {
       bridge.send({ type: "setDrawing", drawing });
       showToast(drawing === "patches" ? "Drawing changed areas only" : "Drawing in tiles");
+    },
+    toggleZen() {
+      const zen = !state.zen;
+      set({ ...state, zen });
+      bridge.send({ type: "setZen", zen });
+      showToast(zen ? "Zen: tool calls hidden" : "Showing tool calls");
     },
     newSession() {
       if (state.running) bridge.send({ type: "cancel" });

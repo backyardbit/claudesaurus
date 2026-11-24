@@ -231,6 +231,18 @@ kbd {
   background: color-mix(in oklab, var(--effort-color) 17%, var(--raised));
 }
 
+/* Shown only while `/zen` hides tool calls, so the missing cards have a visible reason. */
+.chip.zen-chip {
+  border-color: color-mix(in oklab, var(--green) 45%, var(--line));
+  background: color-mix(in oklab, var(--green) 9%, var(--raised));
+  color: color-mix(in oklab, var(--green) 70%, var(--fg));
+  font-weight: 550;
+}
+
+.chip.zen-chip:hover {
+  background: color-mix(in oklab, var(--green) 17%, var(--raised));
+}
+
 .effort-panel {
   width: 19rem;
   padding: 0.6rem 0.8rem 0.5rem;

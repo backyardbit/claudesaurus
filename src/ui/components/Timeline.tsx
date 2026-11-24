@@ -109,19 +109,38 @@ function toolCallIds(items: Item[], found = new Set<string>()) {
   return found;
 }
 
+/**
+ * What `/zen` shows: the messages and notices, without tool calls (a subagent's work included)
+ * or thoughts. Text on either side of a hidden call reads on as the next paragraph.
+ */
+export function zenItems(items: Item[]) {
+  return items.filter((item) => item.kind !== "tool" && item.kind !== "thought");
+}
+
+/** Permission requests with no tool card among `items` to sit under, shown after them. */
+export function loosePermissions(items: Item[], permissions: PermissionRequest[]) {
+  if (permissions.length === 0) return permissions;
+  const known = toolCallIds(items);
+  return permissions.filter((request) => !known.has(request.toolCall.toolCallId));
+}
+
 type TimelineProps = {
   items: Item[];
   permissions: PermissionRequest[];
   /** True while a turn is running. */
   running: boolean;
+  zen: boolean;
 };
 
-export function Timeline({ items, permissions, running }: TimelineProps) {
-  const known = permissions.length > 0 ? toolCallIds(items) : null;
-  const orphans = permissions.filter((request) => !known?.has(request.toolCall.toolCallId));
+export function Timeline({ items, permissions, running, zen }: TimelineProps) {
+  const shown = zen ? zenItems(items) : items;
+  // With the newest item hidden, the last one shown is finished, so its previews can render.
+  const streaming = running && shown.at(-1) === items.at(-1);
+  // Zen hides the tool cards prompts sit under, so every prompt comes after the conversation.
+  const orphans = loosePermissions(shown, permissions);
   return (
     <>
-      <ItemList items={items} permissions={permissions} streaming={running} />
+      <ItemList items={shown} permissions={permissions} streaming={streaming} />
       {orphans.map((request) => (
         <Permission key={request.requestId} request={request} />
       ))}

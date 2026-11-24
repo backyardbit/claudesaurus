@@ -6,11 +6,13 @@ import { z } from "zod";
 /** The saved choices; one that is missing or unknown falls back to its default. */
 const SettingsSchema = z.object({
   drawing: z.enum(["tiles", "patches"]).catch("tiles"),
+  /** `/zen`: the conversation without tool calls and thoughts. */
+  zen: z.boolean().catch(false),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
 
-const DEFAULTS: Settings = { drawing: "tiles" };
+const DEFAULTS: Settings = { drawing: "tiles", zen: false };
 
 function settingsFile() {
   const config = process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config");
