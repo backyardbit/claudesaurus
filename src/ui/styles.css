@@ -667,11 +667,11 @@ kbd {
   font-size: 0.93rem;
 }
 
-.working-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
+.working-dino {
+  width: 25.5px;
+  height: 16.5px;
+  fill: var(--accent);
+  shape-rendering: crispEdges;
 }
 
 /* Welcome */
