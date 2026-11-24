@@ -131,9 +131,9 @@ kbd {
   min-height: 100%;
 }
 
-/* A conversation can be scrolled until its end is near the top, which leaves room for a reply to
-   grow into without the view moving. */
-.column.filled {
+/* While Claude works, the conversation can be scrolled until its end is near the top, which leaves
+   room for the reply to grow into without the view moving. Otherwise it stops at the last line. */
+.column.reserve {
   padding-bottom: calc(100cqh - 4rem);
 }
 
