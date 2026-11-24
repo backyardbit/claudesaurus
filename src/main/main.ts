@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { createRoot } from "@zenbu-labs/pixel";
+import { createRoot, type LoadOptions } from "@zenbu-labs/pixel";
 import { MAIN_CHANNEL, type MainMessage, UI_CHANNEL, type UiMessage } from "../shared/protocol";
 import { createAgent, type ResumeTarget } from "./agent";
 import { startDebugCapture } from "./debug";
@@ -100,9 +100,29 @@ const root = createRoot({
   },
 });
 
+/** The corner radius of a Rex pane, in points. */
+const REX_PANE_RADIUS_PT = 10;
+
+/**
+ * Rex draws its panes with rounded corners, and a square page would cover them. In Rex the page
+ * is rounded the same way, over a clear background, so the pane's own corners show.
+ */
+const inRex = Boolean(process.env.REX_BLOCK);
+if (inRex) root.setClearColor([0, 0, 0, 0]);
+
 const view = root.loadFile(path.join(__dirname, "ui", "index.html"), {
   preload: path.join(__dirname, "preload.cjs"),
   onOpenWindow: () => "deny",
+  // loadFile sizes the page to fill the pane; a style given here replaces that, so it is repeated.
+  ...((inRex
+    ? {
+        style: {
+          width: "100%",
+          height: "100%",
+          cornerRadius: REX_PANE_RADIUS_PT * root.displayScale,
+        },
+      }
+    : {}) as LoadOptions),
 });
 
 const debugDirectory = process.env.CLAUDESAURUS_DEBUG_DIR;
