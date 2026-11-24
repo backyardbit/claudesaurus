@@ -1,0 +1,84 @@
+name: Package
+
+# Builds the release archive and its Homebrew formula, installs the formula with Homebrew on
+# macOS and Linux, and starts the installed app on a recorded conversation.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tap:
+        description: Also install the released formula from backyardbit/tap
+        type: boolean
+        default: false
+
+jobs:
+  formula:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Set up Homebrew
+        if: runner.os == 'Linux'
+        uses: Homebrew/actions/setup-homebrew@main
+      - name: Check and package
+        run: |
+          npm install --global pnpm@9.15.4
+          mkdir -p .tmp && TMPDIR=$PWD/.tmp pnpm install --frozen-lockfile
+          pnpm check
+          version=$(node -p "require('./package.json').version")
+          FORMULA_URL="file://$PWD/release/claudesaurus-$version.tar.gz" pnpm package
+      - name: Install the formula
+        run: |
+          brew tap-new --no-git local/test
+          cp release/claudesaurus.rb "$(brew --repository)/Library/Taps/local/homebrew-test/Formula/"
+          brew trust local/test || true
+          brew install local/test/claudesaurus 2>&1 | tee install.log
+          ! grep -i "error" install.log
+          brew test local/test/claudesaurus
+      - name: Set up the runtime
+        run: claudesaurus --setup
+      - name: Check Electron's signature
+        if: runner.os == 'macOS'
+        run: |
+          app=$(ls -d ~/.local/share/claudesaurus/*/node_modules/@zenbu-labs/pixel/electron/dist/*.app)
+          codesign --verify --deep --strict "$app"
+      - name: Start the app
+        run: scripts/smoke.sh smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.os }}
+          path: smoke
+
+  tap:
+    if: inputs.tap
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install from the tap
+        run: |
+          brew tap backyardbit/tap
+          brew trust backyardbit/tap || true
+          brew install backyardbit/tap/claudesaurus 2>&1 | tee install.log
+          ! grep -i "error" install.log
+      - name: Set up the runtime
+        run: claudesaurus --setup
+      - name: Check Electron's signature
+        run: |
+          app=$(ls -d ~/.local/share/claudesaurus/*/node_modules/@zenbu-labs/pixel/electron/dist/*.app)
+          codesign --verify --deep --strict "$app"
+      - name: Start the app
+        run: scripts/smoke.sh smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-tap
+          path: smoke
