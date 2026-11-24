@@ -233,7 +233,10 @@ function quit() {
   root.stop();
 }
 
-view.webContents.ipc.on(UI_CHANNEL, (_event, message: UiMessage) => {
+view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
+  // A frame inside the page, such as an html block, must not be able to send prompts or answer
+  // permission requests, even if it reaches the channel.
+  if (event.senderFrame !== view.webContents.mainFrame) return;
   switch (message.type) {
     case "ready":
       pageReady = true;
