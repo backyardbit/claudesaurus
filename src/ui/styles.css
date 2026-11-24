@@ -681,10 +681,82 @@ kbd {
 }
 
 .working-dino {
-  width: 25.5px;
-  height: 16.5px;
+  --skin-light: color-mix(in oklab, var(--accent) 62%, white);
+  --skin-dark: color-mix(in oklab, var(--accent) 72%, black);
+  --eye: #2b1f1a;
+  --eggshell: #f4e8d6;
+  flex: none;
+  width: 36px;
+  height: 22.5px;
+  overflow: hidden;
+}
+
+.working-dino .skin {
   fill: var(--accent);
-  shape-rendering: crispEdges;
+}
+
+.working-dino .shade {
+  fill: var(--skin-dark);
+}
+
+.working-dino .belly {
+  fill: var(--skin-light);
+}
+
+.working-dino .white {
+  fill: #fff;
+}
+
+.working-dino .ink {
+  fill: var(--eye);
+}
+
+.working-dino .blush {
+  fill: #ff8fa0;
+  opacity: 0.5;
+}
+
+.working-dino .shadow {
+  fill: var(--fg);
+  opacity: 0.12;
+}
+
+.working-dino .dust {
+  fill: color-mix(in oklab, var(--fg) 30%, var(--bg));
+}
+
+.working-dino .arm {
+  fill: none;
+  stroke: var(--skin-dark);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.working-dino .mouth {
+  fill: none;
+  stroke: var(--skin-dark);
+  stroke-width: 0.7;
+  stroke-linecap: round;
+}
+
+.working-dino .shell {
+  fill: var(--eggshell);
+  stroke: color-mix(in oklab, #3a2a20 35%, var(--eggshell));
+  stroke-width: 0.7;
+}
+
+.working-dino .spot {
+  fill: var(--accent);
+  opacity: 0.32;
+}
+
+.working-dino .crack {
+  fill: none;
+  stroke: #6b4a35;
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
 }
 
 /* Welcome */

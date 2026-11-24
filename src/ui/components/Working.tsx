@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatDuration } from "../format";
+import { Dinosaur } from "./Dinosaur";
 
 /**
  * Words shown while Claude works, as Claude Code does with its own. One is picked at random for
@@ -37,49 +38,13 @@ const WORDS = [
 const WORD_SECONDS = 12;
 
 /**
- * A sauropod walking in place: four frames, with the head nodding on every other one. Each
- * frame is a change the terminal has to draw again, so the walk is kept to a few frames a second.
+ * How often the dinosaur moves. Each frame is a change the terminal has to draw again, so this
+ * is the animation's cost.
  */
-const HEAD_UP = [
-  "............####.",
-  "............#.###",
-  "............##...",
-  "...........##....",
-  "...........##....",
-];
-const HEAD_DOWN = [
-  ".................",
-  "............####.",
-  "............#.###",
-  "...........###...",
-  "...........##....",
-];
-// biome-ignore format: one string per row of pixels
-const BODY = [
-  ".....#######.....",
-  "...#########.....",
-  ".###########.....",
-  "#..#########.....",
-];
-const LEGS = [
-  ["....##...##......", "....##...##......"],
-  ["....##...##......", "...##.....##....."],
-  ["....##...##......", "....##...##......"],
-  [".....##.##.......", ".....##.##......."],
-];
-const FRAME_MS = 250;
+const FRAME_MS = 1000 / 12;
 
-function spritePath(rows: string[]): string {
-  return rows
-    .flatMap((row, y) => [...row].map((cell, x) => (cell === "#" ? `M${x} ${y}h1v1h-1z` : "")))
-    .join("");
-}
-
-const FRAMES = LEGS.map((legs, i) =>
-  spritePath([...(i % 2 ? HEAD_DOWN : HEAD_UP), ...BODY, ...legs]),
-);
-
-/** With reduced motion the dinosaur stands still and the clock ticks once a second. */
+/** With reduced motion the grown dinosaur stands still and the clock ticks once a second. */
+const STILL_AT = 9;
 const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function Working({ since }: { since: number }) {
@@ -92,12 +57,10 @@ export function Working({ since }: { since: number }) {
   const elapsed = Math.max(0, now - since);
   const seconds = Math.floor(elapsed / 1000);
   const word = WORDS[(firstWord + Math.floor(seconds / WORD_SECONDS)) % WORDS.length];
-  const frame = still ? 0 : Math.floor(elapsed / FRAME_MS) % FRAMES.length;
+  const dinoSeconds = still ? STILL_AT : (Math.floor(elapsed / FRAME_MS) * FRAME_MS) / 1000;
   return (
     <div className="working">
-      <svg className="working-dino" viewBox="0 0 17 11" aria-hidden="true">
-        <path d={FRAMES[frame]} />
-      </svg>
+      <Dinosaur seconds={dinoSeconds} />
       {word}… <span className="dim">{formatDuration(seconds * 1000)} · esc to stop</span>
     </div>
   );
