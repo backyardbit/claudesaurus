@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { installRexActions, removeRexActions } from "./rex-actions.mjs";
 import { prepareRuntime } from "./runtime.mjs";
 
 const USAGE = `usage: claudesaurus [options]
@@ -19,6 +20,8 @@ options:
   --continue         reopen the latest session in this directory
   --resume ID        reopen the session with this id
   --setup            download what the app needs now, without opening a chat
+  --remove-rex-actions
+                     take the Claudesaurus split actions out of Rex's command palette
   --version          print the version
   --help             print this help
 
@@ -39,6 +42,24 @@ if (args.includes("--help") || args.includes("-h")) {
 if (args.includes("--version")) {
   console.log(version);
   process.exit(0);
+}
+
+if (args.includes("--remove-rex-actions")) {
+  removeRexActions();
+  console.log("Removed the Claudesaurus actions from Rex's command palette.");
+  process.exit(0);
+}
+
+// Every run keeps the Rex palette actions in step with this install. The Homebrew wrapper names
+// itself, which outlasts upgrades; a source checkout is started with node.
+try {
+  const launcher = process.env.CLAUDESAURUS_LAUNCHER;
+  installRexActions(
+    appRoot,
+    launcher ? [launcher] : [process.execPath, fileURLToPath(import.meta.url)],
+  );
+} catch (error) {
+  console.error(`claudesaurus: could not add the Rex palette actions: ${error.message}`);
 }
 
 // A source checkout has its dependencies beside it. A packaged install fetches them on first use.

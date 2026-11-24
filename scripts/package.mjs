@@ -17,6 +17,7 @@ const contents = [
   "pnpm-lock.yaml",
   "patches",
   "bin",
+  "rex",
   "dist",
   "README.md",
   "LICENSE",
