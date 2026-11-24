@@ -6,6 +6,7 @@
 // user's data folder, the first time the app runs.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 
@@ -21,6 +22,28 @@ const STALE_SETUP_MS = 60 * 60 * 1000;
 export function runtimeHome() {
   const data = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share");
   return path.join(data, "claudesaurus");
+}
+
+/**
+ * Whether the runtime's Electron is whole. On macOS the Electron framework is a bundle of
+ * symlinks, and a copy that has them as plain files fails its signature check, so macOS refuses
+ * to open it and calls it damaged. PixelGUI checks the same file to decide whether to install
+ * Electron again.
+ */
+function electronIntact(root) {
+  if (process.platform !== "darwin") return true;
+  try {
+    const pixel = path.dirname(
+      createRequire(path.join(root, "package.json")).resolve("@zenbu-labs/pixel/package.json"),
+    );
+    const framework = path.join(
+      pixel,
+      "electron/dist/Electron.app/Contents/Frameworks/Electron Framework.framework",
+    );
+    return fs.lstatSync(path.join(framework, "Electron Framework")).isSymbolicLink();
+  } catch {
+    return false;
+  }
 }
 
 function removeOtherVersions(home, version) {
@@ -40,10 +63,13 @@ function removeOtherVersions(home, version) {
 export function prepareRuntime(appRoot, version) {
   const home = runtimeHome();
   const ready = path.join(home, version);
-  if (fs.existsSync(ready)) return ready;
+  const existing = fs.existsSync(ready);
+  if (existing && electronIntact(ready)) return ready;
 
   console.error(
-    `Setting up Claudesaurus ${version} for first use. This downloads its runtime into ${home} and takes about a minute.`,
+    existing
+      ? `The Claudesaurus ${version} runtime in ${home} has a damaged copy of Electron. Setting it up again, which takes about a minute.`
+      : `Setting up Claudesaurus ${version} for first use. This downloads its runtime into ${home} and takes about a minute.`,
   );
   // Set up beside the final folder and rename at the end, so a setup that is interrupted, or two
   // panes that start at once, never leave a half-installed folder in its place.
@@ -62,7 +88,9 @@ export function prepareRuntime(appRoot, version) {
   const npx = path.join(nodeFolder, "npx");
   const installed = spawnSync(
     fs.existsSync(npx) ? npx : "npx",
-    ["--yes", PNPM, "install", "--prod", "--frozen-lockfile"],
+    // pnpm's side-effects cache would put back PixelGUI as its install script last left it, from
+    // a store that keeps no symlinks, and skip the script, which leaves Electron broken on macOS.
+    ["--yes", PNPM, "install", "--prod", "--frozen-lockfile", "--config.side-effects-cache=false"],
     {
       cwd: staging,
       stdio: ["ignore", "inherit", "inherit"],
@@ -79,8 +107,22 @@ export function prepareRuntime(appRoot, version) {
     console.error(`claudesaurus: setup failed (${reason}). Check the network and run it again.`);
     process.exit(1);
   }
+  if (!electronIntact(staging)) {
+    fs.rmSync(staging, { recursive: true, force: true });
+    console.error("claudesaurus: setup failed: Electron was installed without its symlinks.");
+    process.exit(1);
+  }
   fs.rmSync(temporary, { recursive: true, force: true });
 
+  // A damaged runtime is moved aside rather than deleted first, so a failed setup never leaves
+  // the folder missing; removeOtherVersions deletes it.
+  if (existing) {
+    try {
+      fs.renameSync(ready, `${ready}.damaged-${process.pid}`);
+    } catch {
+      // Another pane moved it first.
+    }
+  }
   try {
     fs.renameSync(staging, ready);
   } catch (error) {

@@ -50,6 +50,19 @@ jobs:
         run: |
           app=$(ls -d ~/.local/share/claudesaurus/*/node_modules/@zenbu-labs/pixel/electron/dist/*.app)
           codesign --verify --deep --strict "$app"
+      # A runtime whose Electron framework lost its symlinks is set up again, from a pnpm store
+      # that has now seen PixelGUI, and comes out signed.
+      - name: Repair a damaged runtime
+        if: runner.os == 'macOS'
+        run: |
+          app=$(ls -d ~/.local/share/claudesaurus/*/node_modules/@zenbu-labs/pixel/electron/dist/*.app)
+          framework="$app/Contents/Frameworks/Electron Framework.framework"
+          rm "$framework/Electron Framework"
+          cp "$framework/Versions/A/Electron Framework" "$framework/"
+          ! codesign --verify --deep --strict "$app" 2>/dev/null
+          claudesaurus --setup
+          app=$(ls -d ~/.local/share/claudesaurus/*/node_modules/@zenbu-labs/pixel/electron/dist/*.app)
+          codesign --verify --deep --strict "$app"
       - name: Start the app
         run: scripts/smoke.sh smoke
       - uses: actions/upload-artifact@v4
