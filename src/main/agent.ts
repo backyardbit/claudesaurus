@@ -11,7 +11,7 @@ import {
   type SessionConfigOption,
   type SystemPrompt,
 } from "@agentclientprotocol/sdk";
-import type { MainMessage, PromptImage } from "../shared/protocol";
+import type { MainMessage, PastSession, PromptImage } from "../shared/protocol";
 
 export type AgentOptions = {
   /** Directory Claude works in. */
@@ -189,14 +189,22 @@ export function createAgent(options: AgentOptions) {
     await applyStartupConfig();
   }
 
-  async function latestSessionId(active: ClientConnection) {
+  /** The sessions started in this directory, newest first. */
+  async function pastSessions(active: ClientConnection): Promise<PastSession[]> {
     const { sessions } = await active.agent.request(methods.agent.session.list, {
       cwd: options.cwd,
     });
-    const newestFirst = sessions.toSorted((a, b) =>
-      (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""),
-    );
-    return newestFirst[0]?.sessionId ?? null;
+    return sessions
+      .map(({ sessionId, title, updatedAt }) => ({
+        sessionId,
+        title: title ?? null,
+        updatedAt: updatedAt ?? null,
+      }))
+      .toSorted((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  }
+
+  async function latestSessionId(active: ClientConnection) {
+    return (await pastSessions(active))[0]?.sessionId ?? null;
   }
 
   async function start() {
@@ -318,6 +326,34 @@ export function createAgent(options: AgentOptions) {
     }
   }
 
+  async function listSessions() {
+    if (!connection) return;
+    try {
+      emit({ type: "sessions", sessions: await pastSessions(connection) });
+    } catch (error) {
+      emit({ type: "sessions", sessions: [] });
+      emit({
+        type: "error",
+        fatal: false,
+        message: `Could not list sessions: ${errorMessage(error)}`,
+      });
+    }
+  }
+
+  async function resume(id: string) {
+    if (!connection) return;
+    cancelPendingPermissions();
+    try {
+      await loadSession(connection, id);
+    } catch (error) {
+      emit({
+        type: "error",
+        fatal: false,
+        message: `Could not open session ${id}: ${errorMessage(error)}`,
+      });
+    }
+  }
+
   function dispose() {
     disposed = true;
     cancelPendingPermissions();
@@ -325,7 +361,18 @@ export function createAgent(options: AgentOptions) {
     child?.kill();
   }
 
-  return { start, prompt, steer, cancel, resolvePermission, setConfig, newSession, dispose };
+  return {
+    start,
+    prompt,
+    steer,
+    cancel,
+    resolvePermission,
+    setConfig,
+    newSession,
+    listSessions,
+    resume,
+    dispose,
+  };
 }
 
 export type Agent = ReturnType<typeof createAgent>;

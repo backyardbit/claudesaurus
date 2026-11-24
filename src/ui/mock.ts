@@ -365,6 +365,21 @@ export function createMockBridge(): Bridge {
       case "steer":
         emit({ type: "userMessage", text: message.text, images: message.images });
         break;
+      case "listSessions": {
+        const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+        emit({
+          type: "sessions",
+          sessions: [
+            { sessionId: "mock-1", title: "Fix the flaky upload test", updatedAt: hoursAgo(2) },
+            { sessionId: "mock-2", title: "Add dark mode", updatedAt: hoursAgo(30) },
+            { sessionId: "mock-3", title: null, updatedAt: hoursAgo(24 * 9) },
+          ],
+        });
+        break;
+      }
+      case "resume":
+        emit(session());
+        break;
       case "setConfig":
         configOptions = configOptions.map((option) =>
           option.id === message.configId && option.type === "select"

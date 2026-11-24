@@ -22,3 +22,21 @@ export function shortPath(path: string) {
   const parts = home.split("/");
   return parts.length <= 3 ? home : `…/${parts.slice(-2).join("/")}`;
 }
+
+/** How long ago a time was, in its largest whole unit: "just now", "5m ago", "3d ago". */
+export function formatAge(iso: string, now: number) {
+  const seconds = Math.max(0, (now - Date.parse(iso)) / 1000);
+  if (Number.isNaN(seconds)) return "";
+  if (seconds < 60) return "just now";
+  const units: [string, number][] = [
+    ["y", 365 * 86400],
+    ["mo", 30 * 86400],
+    ["d", 86400],
+    ["h", 3600],
+    ["m", 60],
+  ];
+  for (const [unit, size] of units) {
+    if (seconds >= size) return `${Math.floor(seconds / size)}${unit} ago`;
+  }
+  return "just now";
+}

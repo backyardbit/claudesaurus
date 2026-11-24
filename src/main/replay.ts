@@ -59,6 +59,10 @@ export function createReplayAgent(file: string, emit: (message: MainMessage) => 
     resolvePermission() {},
     async setConfig() {},
     async newSession() {},
+    async listSessions() {
+      emit({ type: "sessions", sessions: [] });
+    },
+    async resume() {},
     dispose() {
       if (timer !== null) clearInterval(timer);
     },

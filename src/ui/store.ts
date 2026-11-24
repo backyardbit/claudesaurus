@@ -17,6 +17,7 @@ import type {
   Bridge,
   Drawing,
   MainMessage,
+  PastSession,
   PromptImage,
   SessionInfo,
 } from "../shared/protocol";
@@ -82,6 +83,8 @@ export type State = {
   permissions: PermissionRequest[];
   usage: Usage | null;
   commands: AvailableCommand[];
+  /** Sessions `/resume` can open, or null while they are being listed. */
+  pastSessions: PastSession[] | null;
   /** True while a past session's conversation is being replayed into the page. */
   replaying: boolean;
   toast: string | null;
@@ -101,6 +104,7 @@ export const initialState: State = {
   permissions: [],
   usage: null,
   commands: [],
+  pastSessions: null,
   replaying: false,
   toast: null,
 };
@@ -343,6 +347,8 @@ export function reduce(state: State, message: MainMessage, now: number): State {
       };
     case "historyLoaded":
       return { ...state, replaying: false };
+    case "sessions":
+      return { ...state, pastSessions: message.sessions };
     case "account":
       return { ...state, account: message.account };
     case "configOptions":
@@ -484,6 +490,15 @@ export function createStore(bridge: Bridge) {
     newSession() {
       if (state.running) bridge.send({ type: "cancel" });
       bridge.send({ type: "newSession" });
+    },
+    /** Lists the sessions `/resume` can open, afresh each time it is typed. */
+    listSessions() {
+      set({ ...state, pastSessions: null });
+      bridge.send({ type: "listSessions" });
+    },
+    resume(sessionId: string) {
+      if (state.running) bridge.send({ type: "cancel" });
+      bridge.send({ type: "resume", sessionId });
     },
     copy(text: string, label = "Copied") {
       bridge.send({ type: "copy", text });
