@@ -30,6 +30,8 @@ export type SessionInfo = {
 export type UiMessage =
   | { type: "ready" }
   | { type: "prompt"; text: string; images: PromptImage[] }
+  /** A message for the turn that is running, which Claude reads before it carries on. */
+  | { type: "steer"; text: string; images: PromptImage[] }
   | { type: "cancel" }
   | { type: "permission"; requestId: string; optionId: string | null }
   | { type: "setConfig"; configId: string; value: string | boolean }

@@ -38,6 +38,11 @@ type AuthStatusParams = {
 
 const STDERR_TAIL_BYTES = 4000;
 
+/** claude-agent-acp's extension request that adds a message to the turn that is running. */
+const STEER_METHOD = "_session/steering";
+
+type SteerResponse = { outcome: "injected" | "promptRequired" | "startedNewTurn" };
+
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -226,19 +231,41 @@ export function createAgent(options: AgentOptions) {
     }
   }
 
-  async function prompt(text: string, images: PromptImage[]) {
-    if (!connection || !sessionId) return;
+  function promptBlocks(text: string, images: PromptImage[]) {
     const blocks: ContentBlock[] = images.map((image) => ({ type: "image", ...image }));
     if (text) blocks.push({ type: "text", text });
+    return blocks;
+  }
+
+  async function prompt(text: string, images: PromptImage[]) {
+    if (!connection || !sessionId) return;
     try {
       const response = await connection.agent.request(methods.agent.session.prompt, {
         sessionId,
-        prompt: blocks,
+        prompt: promptBlocks(text, images),
       });
       emit({ type: "turnEnded", stopReason: response.stopReason });
     } catch (error) {
       emit({ type: "error", fatal: false, message: errorMessage(error) });
       emit({ type: "turnEnded", stopReason: "error" });
+    }
+  }
+
+  /**
+   * Sends a message into the turn that is running instead of after it. If that turn has just
+   * ended, the adapter leaves the message to us, and it starts a turn of its own.
+   */
+  async function steer(text: string, images: PromptImage[]) {
+    if (!connection || !sessionId) return;
+    try {
+      const response = await connection.agent.request<SteerResponse>(STEER_METHOD, {
+        sessionId,
+        prompt: promptBlocks(text, images),
+        _meta: { steering: { idleBehavior: "promptRequired" } },
+      });
+      if (response.outcome === "promptRequired") await prompt(text, images);
+    } catch (error) {
+      emit({ type: "error", fatal: false, message: errorMessage(error) });
     }
   }
 
@@ -298,7 +325,7 @@ export function createAgent(options: AgentOptions) {
     child?.kill();
   }
 
-  return { start, prompt, cancel, resolvePermission, setConfig, newSession, dispose };
+  return { start, prompt, steer, cancel, resolvePermission, setConfig, newSession, dispose };
 }
 
 export type Agent = ReturnType<typeof createAgent>;

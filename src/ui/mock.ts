@@ -362,6 +362,9 @@ export function createMockBridge(): Bridge {
           [600, { type: "turnEnded", stopReason: "end_turn" }],
         ]);
         break;
+      case "steer":
+        emit({ type: "userMessage", text: message.text, images: message.images });
+        break;
       case "setConfig":
         configOptions = configOptions.map((option) =>
           option.id === message.configId && option.type === "select"

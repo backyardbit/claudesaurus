@@ -51,6 +51,8 @@ export function createReplayAgent(file: string, emit: (message: MainMessage) => 
         emit({ type: "turnEnded", stopReason: "end_turn" });
       }, CHUNK_INTERVAL_MS);
     },
+    // The canned reply that is streaming carries on; the page already shows the message.
+    async steer() {},
     async cancel() {
       stopStreaming();
     },

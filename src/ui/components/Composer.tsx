@@ -1,5 +1,5 @@
 import type { AvailableCommand } from "@agentclientprotocol/sdk";
-import { ArrowUp, Folder, Square, X } from "lucide-react";
+import { ArrowUp, CornerDownLeft, Folder, Square, X } from "lucide-react";
 import {
   type ClipboardEvent,
   type KeyboardEvent,
@@ -210,7 +210,20 @@ export function Composer() {
             <div key={index} className="queued">
               <span className="dim">Queued</span>
               <span className="queued-text">{draft.text || "Image"}</span>
-              <button type="button" className="icon-button" onClick={() => actions.unqueue(index)}>
+              <button
+                type="button"
+                className="icon-button"
+                title="Send now"
+                onClick={() => actions.sendNow(index)}
+              >
+                <CornerDownLeft size={13} />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                title="Remove"
+                onClick={() => actions.unqueue(index)}
+              >
                 <X size={13} />
               </button>
             </div>
