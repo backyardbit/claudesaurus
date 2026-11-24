@@ -989,39 +989,84 @@ kbd {
   color: white;
 }
 
-.context-bar {
-  position: relative;
-  height: 1.15rem;
-  margin: 0 1.4rem;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  color: var(--faint);
+.chip.context-chip {
+  gap: 0.3rem;
+  padding: 0 0.55rem 0 0.45rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.context-track {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
+.chip.context-chip.icon-only {
+  padding: 0 0.45rem;
+}
+
+.context-ring {
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+  fill: none;
+  stroke-width: 2.25;
+}
+
+.context-ring-track {
+  stroke: var(--line);
+}
+
+.context-ring-fill {
+  stroke: var(--context-color);
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.4s ease;
+}
+
+.context-percent {
+  color: color-mix(in oklab, var(--context-color) 70%, var(--fg));
+  font-size: 0.8rem;
+}
+
+.context-panel {
+  width: 17rem;
+  padding: 0.6rem 0.8rem 0.65rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.context-heading {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.context-percent-strong {
+  color: color-mix(in oklab, var(--context-color) 70%, var(--fg));
+  font-weight: 600;
+}
+
+.context-meter {
+  height: 8px;
+  margin: 0.55rem 0 0.5rem;
+  border-radius: 4px;
   background: var(--line);
+  overflow: hidden;
 }
 
-.context-fill {
+.context-meter-fill {
   height: 100%;
-  background: var(--muted);
+  width: calc(var(--context-fraction) * 100%);
+  border-radius: 4px;
+  background: var(--context-color);
+  transition: width 0.4s ease;
 }
 
-.context-used {
-  position: absolute;
-  bottom: 3px;
-  transform: translateX(-50%);
+.context-figures {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
-.context-size {
-  position: absolute;
-  right: 0;
-  bottom: 3px;
+.context-figures strong {
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .attachments {

@@ -10,9 +10,10 @@ import {
   useState,
 } from "react";
 import type { PromptImage } from "../../shared/protocol";
-import { formatTokens, shortPath } from "../format";
+import { shortPath } from "../format";
 import { useActions, useAppState } from "../store";
 import { ConfigChips } from "./ConfigChips";
+import { ContextChip } from "./ContextChip";
 
 const MAX_COMMANDS = 8;
 
@@ -53,33 +54,6 @@ function readImage(file: File) {
     };
     reader.readAsDataURL(file);
   });
-}
-
-/** How full Claude's context is. The figures are unknown until Claude reports them in a turn. */
-function ContextBar() {
-  const usage = useAppState((state) => state.usage);
-  if (!usage || usage.size === 0) {
-    return (
-      <div className="context-bar" title="Context usage shows after Claude's next reply">
-        <div className="context-track" />
-      </div>
-    );
-  }
-  const fraction = Math.min(1, usage.used / usage.size);
-  return (
-    <div
-      className="context-bar"
-      title={`${formatTokens(usage.used)} of ${formatTokens(usage.size)} tokens of context used`}
-    >
-      <div className="context-track">
-        <div className="context-fill" style={{ width: `${fraction * 100}%` }} />
-      </div>
-      <span className="context-used" style={{ left: `${fraction * 100}%` }}>
-        {Math.round(fraction * 100)}%
-      </span>
-      <span className="context-size">{formatTokens(usage.size)}</span>
-    </div>
-  );
 }
 
 export function Composer() {
@@ -261,7 +235,6 @@ export function Composer() {
           ))}
         </div>
       )}
-      <ContextBar />
       <div className="composer">
         {images.length > 0 && (
           <div className="attachments">
@@ -305,6 +278,7 @@ export function Composer() {
             </span>
           )}
           <span className="spacer" />
+          <ContextChip />
           {running && !canSend ? (
             <button type="button" className="send stop" title="Stop (esc)" onClick={actions.cancel}>
               <Square size={13} fill="currentColor" />
