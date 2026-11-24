@@ -8,7 +8,15 @@ import path from "node:path";
 const { version } = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const name = `claudesaurus-${version}`;
 const archive = path.join("release", `${name}.tar.gz`);
-const contents = ["package.json", "pnpm-lock.yaml", "patches", "bin", "dist", "README.md"];
+const contents = [
+  "package.json",
+  "pnpm-lock.yaml",
+  "patches",
+  "bin",
+  "dist",
+  "README.md",
+  "LICENSE",
+];
 
 execFileSync("node", ["scripts/build.mjs"], { stdio: "inherit" });
 fs.mkdirSync("release", { recursive: true });
