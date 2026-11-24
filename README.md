@@ -160,7 +160,11 @@ the file (in `profiles/`).
 pnpm dev:ui      # the chat page in a browser, with a scripted conversation (add ?static, ?dark or ?empty)
 pnpm start       # build, then run in this pane
 pnpm check       # format and lint (Biome), typecheck, unit tests
+pnpm lint:slop   # Oxlint with the anti-slop plugin (not yet part of check)
 ```
+
+`tools/oxlint/anti-slop/` is a copy of Dillon Mulroy's anti-slop Oxlint plugin, configured in
+`.oxlintrc.json` with every rule at `error`. Biome and Oxlint leave the copy itself alone.
 
 Set `CLAUDESAURUS_DEBUG_DIR` to a folder to log every message sent to the page
 (`messages.jsonl`) and keep a screenshot of the page as Chromium drew it (`page.png`). With
