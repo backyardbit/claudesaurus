@@ -162,11 +162,18 @@ rex send --block BLOCK 'say hi' && rex send-key --block BLOCK enter
 
 To work on Claudesaurus from a session running in Claudesaurus, build, then hand the pane to the
 new build with `scripts/dogfood-restart.mjs`: it waits for the turn to end, quits the app and
-reopens the same session.
+reopens the same session with this checkout's `bin/claudesaurus.mjs`. It detaches itself, so run
+it straight from the session; it logs to `~/.local/state/claudesaurus/restart.log`.
 
-To look inside a pane that is already running, use its Chromium debugging port: find it with
-`ss -ltnp | grep pixel`, list the pages at `http://127.0.0.1:PORT/json`, and send
-`Runtime.evaluate` over the page's WebSocket.
+```sh
+node scripts/dogfood-restart.mjs "$REX_BLOCK" PIXEL_PID SESSION_ID
+```
+
+`PIXEL_PID` is the pane's `pixel` process, the one listening on the Chromium debugging port.
+
+To look inside a pane that is already running, use that port: find it with
+`ss -ltnp | grep pixel` on Linux or `lsof -nP -iTCP -sTCP:LISTEN | grep pixel` on macOS, list the
+pages at `http://127.0.0.1:PORT/json`, and send `Runtime.evaluate` over the page's WebSocket.
 
 ## Release
 

@@ -2,16 +2,20 @@
 //
 //   node scripts/dogfood-restart.mjs BLOCK PIXEL_PID SESSION_ID
 //
-// It waits for the turn in the pane to end, quits the app, and runs
-// `claudesaurus --resume SESSION_ID` in the shell under it. Start it detached, for example with
-// `systemd-run --user --collect`, because quitting the app ends the session that started it.
-import { execFileSync } from "node:child_process";
+// It waits for the turn in the pane to end, quits the app, and runs this checkout's
+// `bin/claudesaurus.mjs --resume SESSION_ID` in the shell under it. Quitting the app ends the
+// session that started the script, so the script first moves itself into a new process session
+// and returns at once; it logs to ~/.local/state/claudesaurus/restart.log.
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const [, , block, pid, sessionId] = process.argv;
 const state = path.join(os.homedir(), ".local", "state", "claudesaurus");
+const launcher = fileURLToPath(new URL("../bin/claudesaurus.mjs", import.meta.url));
+const DETACHED = "CLAUDESAURUS_RESTART_DETACHED";
 const POLL_MS = 3000;
 const QUIET_POLLS = 3;
 
@@ -22,12 +26,58 @@ function log(text) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const rex = (...args) => execFileSync("rex", args, { encoding: "utf8" });
-const alive = () => fs.existsSync(`/proc/${pid}`);
 
-function debugPort() {
-  const sockets = execFileSync("ss", ["-ltnp"], { encoding: "utf8" }).split("\n");
-  return sockets.find((line) => line.includes(`pid=${pid},`))?.match(/127\.0\.0\.1:(\d+)/)?.[1];
+function alive() {
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
 }
+
+/** The port PixelGUI's Chromium listens on for debugging. macOS has no `ss`, so it uses `lsof`. */
+function debugPort() {
+  const sockets =
+    process.platform === "linux"
+      ? execFileSync("ss", ["-ltnp"], { encoding: "utf8" })
+          .split("\n")
+          .filter((line) => line.includes(`pid=${pid},`))
+      : execFileSync("lsof", ["-nP", "-a", "-p", pid, "-iTCP", "-sTCP:LISTEN"], {
+          encoding: "utf8",
+        }).split("\n");
+  return sockets.map((line) => line.match(/127\.0\.0\.1:(\d+)/)?.[1]).find(Boolean);
+}
+
+/**
+ * Quotes a word for the shell in the pane, which may be sh, zsh or fish. They escape a single
+ * quote differently, so a word with one is refused.
+ */
+function quote(word) {
+  if (word.includes("'")) throw new Error(`cannot quote ${word} for every shell`);
+  return `'${word}'`;
+}
+
+if (!process.env[DETACHED]) {
+  const child = spawn(
+    process.execPath,
+    [fileURLToPath(import.meta.url), ...process.argv.slice(2)],
+    {
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, [DETACHED]: "1" },
+    },
+  );
+  child.unref();
+  console.log(`Restarting ${block} once its turn ends; see ${path.join(state, "restart.log")}`);
+  process.exit(0);
+}
+
+// Detached, the script has no terminal to report to.
+process.on("uncaughtException", (error) => {
+  log(`failed: ${error.message}`);
+  process.exit(1);
+});
 
 async function evaluate(port, expression) {
   const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
@@ -80,6 +130,11 @@ if (alive()) {
   process.exit(1);
 }
 await sleep(1000);
-rex("send", "--block", block, `claudesaurus --resume ${sessionId}`);
+rex(
+  "send",
+  "--block",
+  block,
+  [process.execPath, launcher, "--resume", sessionId].map(quote).join(" "),
+);
 rex("send-key", "--block", block, "enter");
 log(`restarted ${sessionId}`);
