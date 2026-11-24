@@ -54,3 +54,13 @@ test("offers /resume only to an agent that can reopen sessions", () => {
   expect(names(false)).not.toContain("resume");
   expect(matchCommands([], "/age", false).map((command) => command.name)).toEqual(["agent"]);
 });
+
+test("offers /restart and puts it first with the version when an update is ready", () => {
+  const plain = matchCommands([], "/restart", true);
+  expect(plain).toHaveLength(1);
+  expect(plain[0]?.name).toBe("restart");
+
+  const withUpdate = matchCommands([], "/", true, "0.4.0");
+  expect(withUpdate[0]?.name).toBe("restart");
+  expect(withUpdate[0]?.description).toContain("0.4.0");
+});

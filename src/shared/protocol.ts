@@ -88,6 +88,8 @@ export type UiMessage =
   | { type: "setZen"; zen: boolean }
   | { type: "copy"; text: string }
   | { type: "openLink"; url: string }
+  /** Restarts Claudesaurus, applying a downloaded update if one is ready, and resumes this session. */
+  | { type: "restart" }
   | { type: "quit" };
 
 /** Messages the main process sends to the chat page. */
@@ -102,6 +104,8 @@ export type MainMessage =
   | { type: "historyLoaded" }
   /** Whether `/zen` is on, as saved. Sent first whenever the page loads. */
   | { type: "zen"; zen: boolean }
+  /** A newer release has been downloaded in the background and will apply on `/restart`. */
+  | { type: "updateReady"; version: string }
   /** The answer to `listSessions`, newest first. */
   | { type: "sessions"; sessions: PastSession[] }
   | { type: "configOptions"; configOptions: SessionConfigOption[] }

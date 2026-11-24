@@ -12,6 +12,7 @@ import { createReplayAgent } from "./replay";
 import { loadSettings, saveSettings } from "./settings";
 import { createStatusReporter } from "./status";
 import { SYSTEM_PROMPT_APPEND } from "./systemPrompt";
+import { type ReadyUpdate, startAutoUpdater } from "./updater";
 import { createUsageStore } from "./usageStore";
 
 const cwd = process.cwd();
@@ -187,22 +188,56 @@ let history: MainMessage[] = [];
 let pageReady = false;
 
 let sessionId: string | null = null;
+let canResumeSession = false;
+let hasConversation = false;
+let readyUpdate: ReadyUpdate | null = null;
+
+function readAppVersion() {
+  if (process.env.CLAUDESAURUS_VERSION) return process.env.CLAUDESAURUS_VERSION;
+  try {
+    const pkg = z
+      .object({ version: z.string() })
+      .safeParse(JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")));
+    return pkg.success ? pkg.data.version : "";
+  } catch {
+    return "";
+  }
+}
 
 function emit(message: MainMessage) {
   debug?.record(message);
   status.observe(message);
   // Another agent starting replaces everything shown before, and its progress replaces itself.
-  if (message.type === "connecting") history = [];
+  if (message.type === "connecting") {
+    history = [];
+    sessionId = null;
+    canResumeSession = false;
+    hasConversation = false;
+  }
   if (message.type === "session") {
     sessionId = message.session.sessionId;
+    currentAgentId = message.session.agent.id;
+    canResumeSession = message.session.features.resume;
+    hasConversation = message.session.loadingHistory;
     history = history.filter((earlier) => earlier.type === "account");
     root.setTitle("Claudesaurus");
   }
-  if (message.type === "update" && message.update.sessionUpdate === "session_info_update") {
-    if (message.update.title) root.setTitle(`Claudesaurus · ${message.update.title}`);
+  if (message.type === "userMessage") {
+    hasConversation = true;
   }
-  if (message.type === "update" && message.update.sessionUpdate === "usage_update" && sessionId) {
-    usageStore.set(sessionId, { used: message.update.used, size: message.update.size });
+  if (message.type === "update") {
+    if (
+      message.update.sessionUpdate === "user_message_chunk" ||
+      message.update.sessionUpdate === "agent_message_chunk"
+    ) {
+      hasConversation = true;
+    }
+    if (message.update.sessionUpdate === "session_info_update" && message.update.title) {
+      root.setTitle(`Claudesaurus · ${message.update.title}`);
+    }
+    if (message.update.sessionUpdate === "usage_update" && sessionId) {
+      usageStore.set(sessionId, { used: message.update.used, size: message.update.size });
+    }
   }
   // A list answers one request; a page that reloads asks again.
   if (message.type !== "sessions" && message.type !== "agents") history.push(message);
@@ -224,6 +259,7 @@ const claude = {
 
 /** `--agent` picks the agent for this run; otherwise the one last picked with `/agent`. */
 const firstAgentId = resolveAgentId(flags.agent ?? settings.agent);
+let currentAgentId = firstAgentId;
 
 /**
  * Starts an agent. The first one gets what the command line asked for; one picked later with
@@ -257,6 +293,7 @@ if (process.env.CLAUDESAURUS_REPLAY) void agent.start();
 /** Starts a new session on another agent, and makes it the one the next launch starts with. */
 function switchAgent(nextId: string) {
   agent.dispose();
+  currentAgentId = nextId;
   settings.agent = nextId;
   saveSettings(settings);
   agent = startAgent(nextId, null);
@@ -267,12 +304,60 @@ async function listAgents() {
   emit({ type: "agents", agents: await agentChoices(String(version)) });
 }
 
+const updateUrl = process.env.CLAUDESAURUS_UPDATE_URL;
+const autoUpdateEnabled =
+  (process.env.CLAUDESAURUS_PACKAGED === "1" || Boolean(updateUrl)) &&
+  !process.env.CLAUDESAURUS_REPLAY &&
+  process.env.CLAUDESAURUS_NO_AUTO_UPDATE !== "1";
+
+const updater = autoUpdateEnabled
+  ? startAutoUpdater({
+      currentVersion: readAppVersion(),
+      nodePath: claude.nodePath,
+      releaseUrl: updateUrl,
+      initialDelayMs: updateUrl ? 500 : undefined,
+      pollIntervalMs: updateUrl ? 2000 : undefined,
+      checkIntervalMs: updateUrl ? 0 : undefined,
+      onUpdateReady(update) {
+        readyUpdate = update;
+        debug?.note("updateReady", update);
+        if (pageReady) {
+          view.webContents.send(MAIN_CHANNEL, {
+            type: "updateReady",
+            version: update.version,
+          } satisfies MainMessage);
+        }
+      },
+    })
+  : null;
+
 function quit() {
+  updater?.stop();
   debug?.stop();
   usageStore.flush();
   status.clear();
   agent.dispose();
   root.stop();
+}
+
+function restart() {
+  const restartFile = process.env.CLAUDESAURUS_RESTART_FILE;
+  if (!restartFile) {
+    emit({
+      type: "error",
+      fatal: false,
+      message: "Restart is only available when started with the claudesaurus command.",
+    });
+    return;
+  }
+  const payload = {
+    sessionId: canResumeSession && hasConversation ? sessionId : null,
+    agentId: currentAgentId,
+    root: readyUpdate?.root ?? null,
+    version: readyUpdate?.version ?? null,
+  };
+  fs.writeFileSync(restartFile, JSON.stringify(payload));
+  quit();
 }
 
 view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
@@ -283,6 +368,12 @@ view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
     case "ready":
       pageReady = true;
       view.webContents.send(MAIN_CHANNEL, { type: "zen", zen: settings.zen } satisfies MainMessage);
+      if (readyUpdate) {
+        view.webContents.send(MAIN_CHANNEL, {
+          type: "updateReady",
+          version: readyUpdate.version,
+        } satisfies MainMessage);
+      }
       for (const earlier of history) view.webContents.send(MAIN_CHANNEL, earlier);
       break;
     case "prompt":
@@ -337,6 +428,9 @@ view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
       break;
     case "openLink":
       root.setClipboard(message.url);
+      break;
+    case "restart":
+      restart();
       break;
     case "quit":
       quit();

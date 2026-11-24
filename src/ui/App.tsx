@@ -1,4 +1,4 @@
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AuthPrompt } from "./components/AuthPrompt";
 import { Composer } from "./components/Composer";
@@ -6,7 +6,7 @@ import { PlanPill } from "./components/PlanPill";
 import { Timeline } from "./components/Timeline";
 import { Working } from "./components/Working";
 import { shortPath } from "./format";
-import { useAppState } from "./store";
+import { useActions, useAppState } from "./store";
 
 /** Room kept under the newest content when the view moves to show it, in pixels. */
 const FOLLOW_MARGIN = 24;
@@ -144,6 +144,37 @@ export function App() {
         <Composer />
       </div>
       {toast && <div className="toast">{toast}</div>}
+      <UpdateToast />
     </div>
+  );
+}
+
+function UpdateToast() {
+  const version = useAppState((state) => state.updateVersion);
+  const dismissed = useAppState((state) => state.updateDismissed);
+  const actions = useActions();
+  if (!version || dismissed) return null;
+  return (
+    <output className="update-toast">
+      <RefreshCw size={14} className="update-toast-icon" />
+      <span className="update-toast-label">v{version} ready</span>
+      <button
+        type="button"
+        className="chip update-toast-action"
+        title="Restart Claudesaurus to apply update and resume this chat (/restart)"
+        onClick={actions.restart}
+      >
+        /restart
+      </button>
+      <button
+        type="button"
+        className="icon-button"
+        title="Dismiss"
+        aria-label="Dismiss update notification"
+        onClick={actions.dismissUpdate}
+      >
+        <X size={13} />
+      </button>
+    </output>
   );
 }

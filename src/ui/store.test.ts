@@ -246,3 +246,20 @@ test("switching agents clears the previous agent's errors", () => {
   const again = play([{ type: "connecting", agent: claude, detail: null }], failed);
   expect(again.items).toEqual([]);
 });
+
+test("updateReady outlasts new sessions and agent switches, and re-opens on a newer version", () => {
+  const ready = play([
+    { type: "updateReady", version: "0.3.1" },
+    session(false),
+    { type: "connecting", agent: { id: "codex-acp", name: "Codex" }, detail: null },
+  ]);
+  expect(ready.updateVersion).toBe("0.3.1");
+  expect(ready.updateDismissed).toBe(false);
+
+  const dismissed = { ...ready, updateDismissed: true };
+  // Same version stays dismissed; a newer version shows the toast again.
+  expect(play([{ type: "updateReady", version: "0.3.1" }], dismissed).updateDismissed).toBe(true);
+  const newer = play([{ type: "updateReady", version: "0.3.2" }], dismissed);
+  expect(newer.updateVersion).toBe("0.3.2");
+  expect(newer.updateDismissed).toBe(false);
+});

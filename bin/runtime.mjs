@@ -11,17 +11,41 @@ import os from "node:os";
 import path from "node:path";
 
 /** The pnpm that wrote the lockfile. Newer ones skip the install scripts of dependencies. */
-const PNPM = "pnpm@9.15.4";
+export const PNPM = "pnpm@9.15.4";
 
 /** What `pnpm install` needs, and what then runs from the runtime folder. */
-const APP_FILES = ["package.json", "pnpm-lock.yaml", "patches", "bin", "dist"];
+const APP_FILES = ["package.json", "pnpm-lock.yaml", "patches", "bin", "dist", "rex"];
 
 /** How long an unfinished setup folder is left alone, in case another pane is still using it. */
 const STALE_SETUP_MS = 60 * 60 * 1000;
 
+/** Plain MAJOR.MINOR.PATCH version, safe as a single folder name inside runtimeHome. */
+const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
+
+/** How many installed versions to keep when pruning older ones, so running panes keep working. */
+const KEEP_VERSIONS = 2;
+
 export function runtimeHome() {
   const data = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share");
   return path.join(data, "claudesaurus");
+}
+
+/** Compares two MAJOR.MINOR.PATCH strings. Returns >0 if a > b, <0 if a < b, 0 if equal. */
+export function compareVersions(a, b) {
+  const left = SEMVER_RE.exec(a);
+  const right = SEMVER_RE.exec(b);
+  if (!left || !right) return 0;
+  for (let index = 1; index <= 3; index += 1) {
+    const diff = Number(left[index]) - Number(right[index]);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** True when `target` is inside `parent` (not equal to it, and not climbing out). */
+export function isInsideDir(target, parent) {
+  const relative = path.relative(path.resolve(parent), path.resolve(target));
+  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 /**
@@ -30,7 +54,7 @@ export function runtimeHome() {
  * to open it and calls it damaged. PixelGUI checks the same file to decide whether to install
  * Electron again.
  */
-function electronIntact(root) {
+export function electronIntact(root) {
   if (process.platform !== "darwin") return true;
   try {
     const pixel = path.dirname(
@@ -46,14 +70,77 @@ function electronIntact(root) {
   }
 }
 
-function removeOtherVersions(home, version) {
+/** Whether `root` has a complete, runnable copy of Claudesaurus with intact Electron. */
+export function isRuntimeReady(root) {
+  return (
+    fs.existsSync(path.join(root, "package.json")) &&
+    fs.existsSync(path.join(root, "dist", "main.cjs")) &&
+    electronIntact(root)
+  );
+}
+
+/**
+ * Finds the newest ready version installed in `home` that is strictly newer than `afterVersion`,
+ * or null when none is installed.
+ */
+export function latestInstalledVersion(home, afterVersion) {
+  if (!fs.existsSync(home)) return null;
+  let best = null;
   for (const name of fs.readdirSync(home)) {
-    if (name === version) continue;
+    if (!SEMVER_RE.test(name)) continue;
+    if (afterVersion && compareVersions(name, afterVersion) <= 0) continue;
+    if (best && compareVersions(name, best.version) <= 0) continue;
+    const root = path.join(home, name);
+    if (!isRuntimeReady(root)) continue;
+    best = { version: name, root };
+  }
+  return best;
+}
+
+function removeOtherVersions(home, version) {
+  const entries = fs.readdirSync(home);
+  const installed = entries
+    .filter((name) => SEMVER_RE.test(name))
+    .sort((left, right) => compareVersions(right, left));
+  const keep = new Set([version, ...installed.slice(0, KEEP_VERSIONS)]);
+  for (const name of entries) {
+    if (keep.has(name)) continue;
     const entry = path.join(home, name);
-    const unfinished = name.includes(".setup-");
+    const unfinished = name.includes(".setup-") || name.endsWith(".lock");
     if (unfinished && Date.now() - fs.statSync(entry).mtimeMs < STALE_SETUP_MS) continue;
     fs.rmSync(entry, { recursive: true, force: true });
   }
+}
+
+/**
+ * Builds the CLI arguments for restarting after `/restart`. When a session is being resumed, the
+ * resumed session carries its own settings, so old `--resume`, `--continue` and startup flags are
+ * replaced with `--agent` and `--resume`. When restarting an empty session, startup flags such as
+ * `--model` and `--effort` are preserved.
+ */
+export function restartArgs(previousArgs, request) {
+  const stripWithValue = new Set(["--resume", "--agent"]);
+  const stripFlags = new Set(["--continue"]);
+  if (request.sessionId) {
+    stripWithValue.add("--model");
+    stripWithValue.add("--effort");
+    stripWithValue.add("--mode");
+  }
+  const kept = [];
+  for (let index = 0; index < previousArgs.length; index += 1) {
+    const arg = previousArgs[index];
+    if (stripFlags.has(arg)) continue;
+    if (stripWithValue.has(arg)) {
+      index += 1;
+      continue;
+    }
+    const equals = arg.indexOf("=");
+    if (equals !== -1 && stripWithValue.has(arg.slice(0, equals))) continue;
+    kept.push(arg);
+  }
+  if (request.agentId) kept.push("--agent", request.agentId);
+  if (request.sessionId) kept.push("--resume", request.sessionId);
+  return kept;
 }
 
 /**
@@ -77,7 +164,8 @@ export function prepareRuntime(appRoot, version) {
   fs.rmSync(staging, { recursive: true, force: true });
   fs.mkdirSync(staging, { recursive: true });
   for (const name of APP_FILES) {
-    fs.cpSync(path.join(appRoot, name), path.join(staging, name), { recursive: true });
+    const source = path.join(appRoot, name);
+    if (fs.existsSync(source)) fs.cpSync(source, path.join(staging, name), { recursive: true });
   }
 
   // PixelGUI's install script moves Electron into place with a rename, which only works within
