@@ -9,21 +9,33 @@ import {
   useRef,
   useState,
 } from "react";
-import type { PromptImage } from "../../shared/protocol";
-import { shortPath } from "../format";
+import type { PastSession, PromptImage } from "../../shared/protocol";
+import { formatAge, shortPath } from "../format";
 import { useActions, useAppState } from "../store";
 import { ConfigChips } from "./ConfigChips";
 import { ContextChip } from "./ContextChip";
 
 const MAX_COMMANDS = 8;
+const MAX_SESSIONS = 10;
 
 /** Commands the page answers itself, listed ahead of Claude's own. */
 const LOCAL_COMMANDS: AvailableCommand[] = [
   { name: "new", description: "Start a new chat" },
+  { name: "resume", description: "Open a past chat from this folder" },
   { name: "patches", description: "Draw only the areas that change: much less data to send" },
   { name: "tiles", description: "Draw in tiles, PixelGUI's usual way in Rex" },
   { name: "quit", description: "Close Claudesaurus" },
 ];
+
+const LOCAL_NAMES = new Set(LOCAL_COMMANDS.map((command) => command.name));
+
+/** `/resume` and what follows it, which picks a past session. */
+const RESUME_PATTERN = /^\/resume\s+(.*)$/s;
+
+const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A row of the menu above the composer: a command to complete, or a session to open. */
+type MenuEntry = { key: string; name: string; detail: string; mono: boolean; pick(): void };
 
 /** How a typed character reaches the input, as opposed to a paste or a drop. */
 const TYPED_INPUT = new Set(["insertText", "insertLineBreak", "insertParagraph"]);
@@ -35,13 +47,25 @@ function matchCommands(commands: AvailableCommand[], text: string) {
   const match = /^\/(\S*)$/.exec(text);
   if (!match) return [];
   const query = (match[1] ?? "").toLowerCase();
-  const all = [...LOCAL_COMMANDS, ...commands];
+  const all = [...LOCAL_COMMANDS, ...commands.filter((command) => !LOCAL_NAMES.has(command.name))];
   const starts = all.filter((command) => command.name.toLowerCase().startsWith(query));
   const contains = all.filter(
     (command) =>
       !command.name.toLowerCase().startsWith(query) && command.name.toLowerCase().includes(query),
   );
   return [...starts, ...contains].slice(0, MAX_COMMANDS);
+}
+
+/** The sessions whose title or id holds every word of the query, other than the open one. */
+export function matchSessions(sessions: PastSession[], query: string, currentId: string | null) {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  return sessions
+    .filter((past) => past.sessionId !== currentId)
+    .filter((past) => {
+      const haystack = `${past.title ?? ""} ${past.sessionId}`.toLowerCase();
+      return words.every((word) => haystack.includes(word));
+    })
+    .slice(0, MAX_SESSIONS);
 }
 
 function readImage(file: File) {
@@ -64,6 +88,7 @@ export function Composer() {
   const configOptions = useAppState((state) => state.configOptions);
   const commands = useAppState((state) => state.commands);
   const queue = useAppState((state) => state.queue);
+  const pastSessions = useAppState((state) => state.pastSessions);
   const pendingPermission = useAppState((state) => state.permissions[0] ?? null);
 
   const [text, setText] = useState("");
@@ -74,11 +99,45 @@ export function Composer() {
   /** When a key press was last handled as a command, so the character it types can be dropped. */
   const consumedKeyAt = useRef(Number.NEGATIVE_INFINITY);
 
+  const resumeQuery = RESUME_PATTERN.exec(text)?.[1] ?? null;
+  const resuming = resumeQuery !== null;
   const matches = useMemo(
-    () => (menuDismissed ? [] : matchCommands(commands, text)),
-    [commands, text, menuDismissed],
+    () => (menuDismissed || resuming ? [] : matchCommands(commands, text)),
+    [commands, text, menuDismissed, resuming],
   );
-  const active = matches[Math.min(selected, matches.length - 1)];
+  const sessionMatches = useMemo(
+    () =>
+      resumeQuery === null || menuDismissed
+        ? []
+        : matchSessions(pastSessions ?? [], resumeQuery, session?.sessionId ?? null),
+    [pastSessions, resumeQuery, menuDismissed, session],
+  );
+  const entries: MenuEntry[] = resuming
+    ? sessionMatches.map((past) => ({
+        key: past.sessionId,
+        name: past.title ?? "Untitled chat",
+        detail: past.updatedAt ? formatAge(past.updatedAt, Date.now()) : "",
+        mono: false,
+        pick: () => resume(past.sessionId),
+      }))
+    : matches.map((command) => ({
+        key: command.name,
+        name: `/${command.name}`,
+        detail: command.description ?? "",
+        mono: true,
+        pick: () => complete(command),
+      }));
+  const active = entries[Math.min(selected, entries.length - 1)];
+  const resumeTitle =
+    !resuming || menuDismissed
+      ? null
+      : pastSessions === null
+        ? "Listing chats…"
+        : entries.length > 0
+          ? "Resume a chat"
+          : resumeQuery.trim()
+            ? "No chats match"
+            : "No other chats in this folder";
   const canSend = phase === "ready" && (text.trim() !== "" || images.length > 0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the height depends on the text
@@ -89,6 +148,11 @@ export function Composer() {
     element.style.height = `${element.scrollHeight}px`;
     element.style.overflowY = element.scrollHeight > element.clientHeight + 1 ? "auto" : "hidden";
   }, [text]);
+
+  // Lists the sessions anew each time `/resume` is typed, so a chat from just now is there.
+  useEffect(() => {
+    if (resuming) actions.listSessions();
+  }, [resuming, actions]);
 
   useEffect(() => {
     // The terminal delivers a key press and the character it types as separate events, so
@@ -122,6 +186,17 @@ export function Composer() {
   function submit(now = false) {
     if (!canSend) return;
     const command = text.trim();
+    if (command === "/resume") {
+      setText("/resume ");
+      setMenuDismissed(false);
+      return;
+    }
+    if (resuming) {
+      // Enter with no chat picked opens one only when the text is a whole session id.
+      const id = resumeQuery.trim();
+      if (SESSION_ID_PATTERN.test(id)) resume(id);
+      return;
+    }
     if (command === "/new" || command === "/clear") actions.newSession();
     else if (command === "/quit" || command === "/exit") actions.quit();
     else if (command === "/patches") actions.setDrawing("patches");
@@ -136,6 +211,12 @@ export function Composer() {
     setSelected(0);
   }
 
+  function resume(sessionId: string) {
+    actions.resume(sessionId);
+    setText("");
+    setSelected(0);
+  }
+
   function handleKey(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (pendingPermission && text === "" && /^[1-9]$/.test(event.key)) {
       const option = pendingPermission.options[Number(event.key) - 1];
@@ -145,16 +226,16 @@ export function Composer() {
         return;
       }
     }
-    if (matches.length > 0) {
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (entries.length > 0 || resumeTitle !== null) {
+      if ((event.key === "ArrowDown" || event.key === "ArrowUp") && entries.length > 0) {
         event.preventDefault();
         const step = event.key === "ArrowDown" ? 1 : -1;
-        setSelected((selected + step + matches.length) % matches.length);
+        setSelected((selected + step + entries.length) % entries.length);
         return;
       }
       if ((event.key === "Tab" || event.key === "Enter") && active) {
         event.preventDefault();
-        complete(active);
+        active.pick();
         return;
       }
       if (event.key === "Escape") {
@@ -238,20 +319,21 @@ export function Composer() {
           ))}
         </div>
       )}
-      {matches.length > 0 && (
-        <div className="command-menu">
-          {matches.map((command) => (
+      {(entries.length > 0 || resumeTitle !== null) && (
+        <div className={`command-menu ${resuming ? "sessions" : ""}`}>
+          {resumeTitle !== null && <div className="menu-title">{resumeTitle}</div>}
+          {entries.map((entry) => (
             <button
               type="button"
-              key={command.name}
-              className={`menu-item ${command === active ? "selected" : ""}`}
+              key={entry.key}
+              className={`menu-item ${entry === active ? "selected" : ""}`}
               onClick={() => {
-                complete(command);
+                entry.pick();
                 input.current?.focus();
               }}
             >
-              <span className="menu-name mono">/{command.name}</span>
-              <span className="menu-description">{command.description}</span>
+              <span className={`menu-name ${entry.mono ? "mono" : ""}`}>{entry.name}</span>
+              <span className="menu-description">{entry.detail}</span>
             </button>
           ))}
         </div>

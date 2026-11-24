@@ -1206,6 +1206,17 @@ kbd {
   white-space: nowrap;
 }
 
+.command-menu.sessions .menu-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-menu.sessions .menu-description {
+  flex-shrink: 0;
+}
+
 .settings {
   display: flex;
   flex-direction: column;

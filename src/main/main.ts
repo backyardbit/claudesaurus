@@ -150,7 +150,8 @@ function emit(message: MainMessage) {
   if (message.type === "update" && message.update.sessionUpdate === "usage_update" && sessionId) {
     usageStore.set(sessionId, { used: message.update.used, size: message.update.size });
   }
-  history.push(message);
+  // A session list answers one request; a page that reloads asks again.
+  if (message.type !== "sessions") history.push(message);
   if (pageReady) view.webContents.send(MAIN_CHANNEL, message);
   if (message.type === "historyLoaded") restoreUsage();
 }
@@ -209,6 +210,12 @@ view.webContents.ipc.on(UI_CHANNEL, (_event, message: UiMessage) => {
       break;
     case "newSession":
       void agent.newSession();
+      break;
+    case "listSessions":
+      void agent.listSessions();
+      break;
+    case "resume":
+      void agent.resume(message.sessionId);
       break;
     case "setDrawing":
       settings.drawing = message.drawing;

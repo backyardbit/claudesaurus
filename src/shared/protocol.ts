@@ -14,6 +14,9 @@ export type Drawing = "tiles" | "patches";
 
 export type PromptImage = { data: string; mimeType: string };
 
+/** A session that can be opened again, from the directory Claudesaurus runs in. */
+export type PastSession = { sessionId: string; title: string | null; updatedAt: string | null };
+
 export type AccountInfo = { label: string; email: string | null };
 
 export type SessionInfo = {
@@ -36,6 +39,8 @@ export type UiMessage =
   | { type: "permission"; requestId: string; optionId: string | null }
   | { type: "setConfig"; configId: string; value: string | boolean }
   | { type: "newSession" }
+  | { type: "listSessions" }
+  | { type: "resume"; sessionId: string }
   | { type: "setDrawing"; drawing: Drawing }
   | { type: "copy"; text: string }
   | { type: "openLink"; url: string }
@@ -47,6 +52,8 @@ export type MainMessage =
   | { type: "session"; session: SessionInfo }
   | { type: "account"; account: AccountInfo }
   | { type: "historyLoaded" }
+  /** The answer to `listSessions`, newest first. */
+  | { type: "sessions"; sessions: PastSession[] }
   | { type: "configOptions"; configOptions: SessionConfigOption[] }
   | { type: "userMessage"; text: string; images: PromptImage[] }
   | { type: "update"; update: SessionUpdate }

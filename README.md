@@ -78,6 +78,7 @@ chat can draw, so Claude answers "show me" with an inline `html` block instead o
 | Shift+Enter              | New line                                                   |
 | Esc                      | Stop Claude                                                |
 | `/`                      | Slash commands. `/new` starts a new chat, `/quit` closes   |
+| `/resume`                | Pick a past chat from this directory; type to filter       |
 | `/patches`, `/tiles`     | Choose how frames are drawn (see Performance)              |
 | 1–9                      | Answer a permission prompt (with an empty input)           |
 | Ctrl+C                   | Copy the selection, else stop Claude, else clear the input |
@@ -191,6 +192,5 @@ screenshot of the page. Run it with the `tap` input to check the released formul
 
 ## Not built yet
 
-- Picking a past session from a list (`--resume` needs its id).
 - `@` file mentions.
 - Opening links and files on the computer you are sitting at.
