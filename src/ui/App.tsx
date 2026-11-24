@@ -9,12 +9,6 @@ import { useAppState } from "./store";
 /** Room kept under the newest content when the view moves to show it, in pixels. */
 const FOLLOW_MARGIN = 24;
 
-/**
- * Where the newest content lands when the view moves during a turn, as a fraction of the pane's
- * height from the top. The space below it fills up before the view has to move again.
- */
-const PAGE_ANCHOR = 0.3;
-
 /** Room kept above a message that was just sent, in pixels. */
 const SENT_MARGIN = 16;
 
@@ -64,14 +58,14 @@ export function App() {
   const column = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const following = useRef(true);
-  const runningNow = useRef(running);
-  runningNow.current = running;
   const sentMessage = useRef<string | null>(null);
   const [away, setAway] = useState(false);
 
   /**
-   * Brings the newest content into view once it runs past the bottom. Moving the view redraws
-   * the whole pane in the terminal, so during a turn it moves a page at a time, not a line.
+   * Keeps the newest content at the bottom of the view once it runs past it. PixelGUI moves the
+   * picture already in the terminal and sends only the strip that scrolled in, so following line
+   * by line costs about a quarter more drawing during a turn than moving a page at a time did,
+   * and leaves no empty space under the newest line.
    */
   const follow = useCallback(() => {
     const view = scroller.current;
@@ -79,9 +73,7 @@ export function App() {
     if (!view || !marker || !following.current) return;
     const bottom = marker.offsetTop;
     if (bottom <= view.scrollTop + view.clientHeight - FOLLOW_MARGIN) return;
-    view.scrollTop = runningNow.current
-      ? bottom - view.clientHeight * PAGE_ANCHOR
-      : bottom - view.clientHeight + FOLLOW_MARGIN;
+    view.scrollTop = bottom - view.clientHeight + FOLLOW_MARGIN;
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: new content is what moves the end
