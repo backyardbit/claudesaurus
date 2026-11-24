@@ -13,9 +13,13 @@ const bridge: Bridge = {
   },
 };
 
-contextBridge.exposeInMainWorld("claudesaurus", bridge);
-contextBridge.exposeInMainWorld("pixel", {
-  theme: () => pixel.theme(),
-  onTheme: (subscriber: Parameters<typeof pixel.onTheme>[0]) => pixel.onTheme(subscriber),
-  quit: () => pixel.quit(),
-});
+// PixelGUI runs this preload in every frame, including the sandboxed frames of html blocks, whose
+// content comes from the model. Only the chat page itself gets the bridge.
+if (window === window.top) {
+  contextBridge.exposeInMainWorld("claudesaurus", bridge);
+  contextBridge.exposeInMainWorld("pixel", {
+    theme: () => pixel.theme(),
+    onTheme: (subscriber: Parameters<typeof pixel.onTheme>[0]) => pixel.onTheme(subscriber),
+    quit: () => pixel.quit(),
+  });
+}
