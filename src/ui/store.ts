@@ -112,6 +112,8 @@ export type State = {
   updateVersion: string | null;
   /** True after the user closes the update toast; `/restart` still applies the update. */
   updateDismissed: boolean;
+  /** Text waiting to be put in the composer, which takes it once. */
+  draft: string | null;
   toast: string | null;
 };
 
@@ -138,6 +140,7 @@ export const initialState: State = {
   zen: false,
   updateVersion: null,
   updateDismissed: false,
+  draft: null,
   toast: null,
 };
 
@@ -398,6 +401,7 @@ export function reduce(state: State, message: MainMessage, now: number): State {
         zen: state.zen,
         updateVersion: state.updateVersion,
         updateDismissed: state.updateDismissed,
+        draft: state.draft,
         replaying: message.session.loadingHistory,
       };
     case "historyLoaded":
@@ -407,6 +411,11 @@ export function reduce(state: State, message: MainMessage, now: number): State {
     case "updateReady":
       if (message.version === state.updateVersion) return state;
       return { ...state, updateVersion: message.version, updateDismissed: false };
+    case "draft":
+      return { ...state, draft: message.text };
+    // A toast is shown by the store, with its own timer, rather than kept as state.
+    case "toast":
+      return state;
     case "sessions":
       return { ...state, pastSessions: message.sessions };
     case "account":
@@ -497,6 +506,10 @@ export function createStore(bridge: Bridge) {
   }
 
   bridge.subscribe((message) => {
+    if (message.type === "toast") {
+      showToast(message.text);
+      return;
+    }
     set(reduce(state, message, Date.now()));
     if (message.type !== "turnEnded") return;
     const [next, ...rest] = state.queue;
@@ -601,9 +614,15 @@ export function createStore(bridge: Bridge) {
       bridge.send({ type: "copy", text });
       showToast(label);
     },
+    /** Main answers with a toast saying what it did: opened a pull request, or copied the link. */
     openLink(url: string) {
       bridge.send({ type: "openLink", url });
-      showToast("Link copied");
+    },
+    /** Hands the waiting draft to the composer, once. */
+    takeDraft() {
+      const { draft } = state;
+      if (draft !== null) set({ ...state, draft: null });
+      return draft;
     },
     restart() {
       if (state.running) bridge.send({ type: "cancel" });

@@ -106,6 +106,10 @@ export type MainMessage =
   | { type: "zen"; zen: boolean }
   /** A newer release has been downloaded in the background and will apply on `/restart`. */
   | { type: "updateReady"; version: string }
+  /** Text to leave in the composer for the reader to send, such as a task from the PR viewer. */
+  | { type: "draft"; text: string }
+  /** A short note from the main process, such as what clicking a link did. */
+  | { type: "toast"; text: string }
   /** The answer to `listSessions`, newest first. */
   | { type: "sessions"; sessions: PastSession[] }
   | { type: "configOptions"; configOptions: SessionConfigOption[] }

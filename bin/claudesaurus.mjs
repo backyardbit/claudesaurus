@@ -16,9 +16,14 @@ import {
 } from "./runtime.mjs";
 
 const USAGE = `usage: claudesaurus [options]
+       claudesaurus pr [PR]
 
 Opens a graphical Claude Code chat in this terminal pane, working in the current directory.
 The terminal must draw images with the Kitty graphics protocol, as Rex, Ghostty and kitty do.
+
+\`claudesaurus pr\` opens a GitHub pull request to read and review instead: PR is a number of
+this folder's repository, owner/repo#N, or the pull request's URL. Without PR it opens the pull
+request of the branch checked out here. It reads and writes GitHub through the gh CLI.
 
 options:
   --agent NAME       chat with another agent from the ACP registry for this run: codex, grok,
@@ -40,6 +45,8 @@ examples:
   claudesaurus --model opus --effort high
   claudesaurus --continue
   claudesaurus --agent codex
+  claudesaurus pr 15
+  claudesaurus pr backyardbit/claudesaurus#15
 `;
 
 const appRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -86,16 +93,17 @@ if (args.includes("--remove-rex-actions")) {
   process.exit(0);
 }
 
+// How to start this install again, for the Rex palette actions and for the panes the app opens
+// itself. The Homebrew wrapper names itself, which outlasts upgrades; a source checkout is
+// started with node.
+const launcher = process.env.CLAUDESAURUS_LAUNCHER;
+const command = launcher ? [launcher] : [process.execPath, fileURLToPath(import.meta.url)];
+
 function updateRexActions(sourceRoot) {
   if (!existsSync(path.join(sourceRoot, "rex", "claudesaurus.lua"))) return;
-  // Every run keeps the Rex palette actions in step with this install. The Homebrew wrapper names
-  // itself, which outlasts upgrades; a source checkout is started with node.
+  // Every run keeps the Rex palette actions in step with this install.
   try {
-    const launcher = process.env.CLAUDESAURUS_LAUNCHER;
-    installRexActions(
-      sourceRoot,
-      launcher ? [launcher] : [process.execPath, fileURLToPath(import.meta.url)],
-    );
+    installRexActions(sourceRoot, command);
   } catch (error) {
     console.error(`claudesaurus: could not add the Rex palette actions: ${error.message}`);
   }
@@ -119,7 +127,9 @@ let currentVersion = version;
 let currentArgs = args;
 
 while (true) {
-  const entry = path.join(currentRoot, "dist", "main.cjs");
+  // `claudesaurus pr` runs the pull request viewer, which has its own entry and never restarts.
+  const viewingPullRequest = currentArgs[0] === "pr";
+  const entry = path.join(currentRoot, "dist", viewingPullRequest ? "pr.cjs" : "main.cjs");
   if (!existsSync(entry)) {
     console.error("claudesaurus: not built yet. Run `pnpm build` in the claudesaurus folder.");
     process.exit(1);
@@ -134,11 +144,13 @@ while (true) {
   const restartFile = path.join(os.tmpdir(), `claudesaurus-restart-${process.pid}.json`);
   rmSync(restartFile, { force: true });
 
-  const result = spawnSync(process.execPath, [pixelBin, entry, "--", ...currentArgs], {
+  const appArgs = viewingPullRequest ? currentArgs.slice(1) : currentArgs;
+  const result = spawnSync(process.execPath, [pixelBin, entry, "--", ...appArgs], {
     stdio: "inherit",
     env: {
       ...process.env,
       CLAUDESAURUS_NODE: process.execPath,
+      CLAUDESAURUS_COMMAND: JSON.stringify(command),
       CLAUDESAURUS_VERSION: currentVersion,
       CLAUDESAURUS_PACKAGED: packaged ? "1" : "0",
       CLAUDESAURUS_RESTART_FILE: restartFile,

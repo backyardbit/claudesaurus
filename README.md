@@ -24,6 +24,8 @@ Rex pane  <-- Kitty graphics --  PixelGUI (Chromium, off screen)  -- chat page (
   the Kitty graphics protocol, and feeds the terminal's keyboard and mouse back to the page.
 - **`src/ui`** is the chat page. It renders Markdown with `react-markdown`, math with KaTeX, and
   `html` code blocks in sandboxed iframes.
+- **`src/pr`** is the pull request viewer's page, and `src/main/prViewer.ts` its main process,
+  which reads GitHub with `gh` (`src/main/pr`).
 - **`src/main`** is the main process. It starts
   [`claude-agent-acp`](https://github.com/agentclientprotocol/claude-agent-acp), the adapter T3 Code
   and Zed use, speaks the [Agent Client Protocol](https://agentclientprotocol.com) to it with the
@@ -120,7 +122,37 @@ drawn again in the terminal.
 | Ctrl+= / Ctrl+- / Ctrl+0 | Zoom                                                       |
 | Ctrl+Q                   | Quit                                                       |
 
-Clicking a link copies its address, since the page cannot open a browser on your computer.
+Clicking a link copies its address, since the page cannot open a browser on your computer. A
+GitHub pull request link instead opens the pull request viewer in a split beside the chat (in Rex);
+the next one replaces it.
+
+## Pull requests
+
+```sh
+claudesaurus pr                               # the pull request of the branch checked out here
+claudesaurus pr 15                            # pull request 15 of this folder's repository
+claudesaurus pr owner/repo#15                 # or name the repository
+claudesaurus pr https://github.com/owner/repo/pull/15
+```
+
+The viewer is T3 Code's pull request view, ported (`src/pr`, MIT, see `src/pr/T3CODE-LICENSE`),
+reading and writing GitHub through the `gh` CLI and its login:
+
+- **Summary**: reviewers (and requesting more), labels, the description, checks, and the
+  conversation, with reactions, editing your own comments, and a box to comment.
+- **Timeline**: commits, reviews and comments in order; a commit opens its diff in Code.
+- **Code**: the diff, stacked or split, with syntax highlighting, expandable context and a scope
+  menu for one commit. Click a line number, or drag across several, to comment: comments gather
+  into a pending review that **Review** submits as a comment, an approval or a change request.
+  Review threads sit under their lines, where you can reply and resolve them.
+- The header holds the merge button and a menu with ready/draft, auto-merge, the merge method,
+  close and reopen, and the title is editable.
+- **Ask a question**, **Explain this PR**, **Fix** and **Ask** on selected lines leave the task
+  in a chat's composer, for you to read over and send. When a chat opened the viewer from a link,
+  the task goes to that chat, after anything already typed, and the focus moves there; otherwise
+  a new chat opens beside the viewer.
+- **Check out** puts the branch in a worktree beside this checkout (`<repo>-worktrees/pr-N`) or
+  checks it out here, and opens a chat there.
 
 ## Other agents
 
@@ -233,6 +265,7 @@ the file (in `profiles/`).
 
 ```sh
 pnpm dev:ui      # the chat page in a browser, with a scripted conversation (add ?static, ?dark or ?empty)
+pnpm dev:pr      # the PR viewer's page in a browser; it needs the app's bridge, so check it in Rex
 pnpm start       # build, then run in this pane
 pnpm check       # format and lint (Biome), anti-slop lint (Oxlint), typecheck, unit tests
 pnpm lint:slop   # just the anti-slop lint
