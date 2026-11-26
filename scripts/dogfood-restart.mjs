@@ -3,7 +3,8 @@
 //   node scripts/dogfood-restart.mjs BLOCK PIXEL_PID SESSION_ID
 //
 // It waits for the turn in the pane to end, quits the app, and runs this checkout's
-// `bin/claudesaurus.mjs --resume SESSION_ID` in the shell under it. Quitting the app ends the
+// `bin/claudesaurus.mjs --resume SESSION_ID --agent AGENT` in the shell under it, with the agent
+// the pane was running. Quitting the app ends the
 // session that started the script, so the script first moves itself into a new process session
 // and returns at once; it logs to ~/.local/state/claudesaurus/restart.log.
 import { execFileSync, spawn } from "node:child_process";
@@ -11,6 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 
 const [, , block, pid, sessionId] = process.argv;
 const state = path.join(os.homedir(), ".local", "state", "claudesaurus");
@@ -47,6 +49,38 @@ function debugPort() {
           encoding: "utf8",
         }).split("\n");
   return sockets.map((line) => line.match(/127\.0\.0\.1:(\d+)/)?.[1]).find(Boolean);
+}
+
+/**
+ * The agents' names in the Program Status Protocol, as `statusApp` in src/main/status.ts reports
+ * them, back to their registry ids. Any other agent reports its registry id itself.
+ */
+const AGENT_IDS = new Map([
+  ["claude-code", "claude-acp"],
+  ["codex", "codex-acp"],
+  ["grok-build", "grok-build"],
+  ["agy", "antigravity-acp"],
+  ["gemini", "gemini"],
+  ["cursor-agent", "cursor"],
+  ["opencode", "opencode"],
+]);
+
+/**
+ * The agent the pane is running, read from its program status before the app quits. A session
+ * belongs to its agent, and without `--agent` the app starts the agent last picked in any pane.
+ */
+const StatusSchema = z.object({ records: z.array(z.object({ app: z.string() })).min(1) });
+
+function runningAgent() {
+  try {
+    const status = StatusSchema.parse(
+      JSON.parse(rex("block", "call", "-b", block, "program_status")),
+    );
+    const app = status.records[0]?.app ?? "";
+    return AGENT_IDS.get(app) ?? app;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -123,6 +157,7 @@ for (let quiet = 0; quiet < QUIET_POLLS; ) {
   quiet = busy ? 0 : quiet + 1;
 }
 
+const agent = runningAgent();
 rex("send-key", "--block", block, "ctrl+q");
 for (let waited = 0; alive() && waited < 20; waited += 1) await sleep(500);
 if (alive()) {
@@ -134,7 +169,9 @@ rex(
   "send",
   "--block",
   block,
-  [process.execPath, launcher, "--resume", sessionId].map(quote).join(" "),
+  [process.execPath, launcher, "--resume", sessionId, ...(agent ? ["--agent", agent] : [])]
+    .map(quote)
+    .join(" "),
 );
 rex("send-key", "--block", block, "enter");
-log(`restarted ${sessionId}`);
+log(`restarted ${sessionId} with ${agent ?? "the saved agent"}`);
