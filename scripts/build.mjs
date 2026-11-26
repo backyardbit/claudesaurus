@@ -26,6 +26,12 @@ await esbuild({
 
 await esbuild({
   ...node,
+  entryPoints: ["src/main/celebrateServer.ts"],
+  outfile: "dist/celebrate.cjs",
+});
+
+await esbuild({
+  ...node,
   entryPoints: ["src/preload/preload.ts"],
   outfile: "dist/preload.cjs",
   external: ["electron"],

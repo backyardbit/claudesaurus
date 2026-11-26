@@ -21,4 +21,6 @@ Rules for an inline html block:
 - It starts on a white background with dark text, about 800px wide. Style it yourself and keep it compact; a block taller than about 640px scrolls.
 - Write only the content, not a full page skeleton, unless you need a <head>.
 
-An HTML or SVG file you create with the Write tool also gets a Preview link in the conversation.`;
+An HTML or SVG file you create with the Write tool also gets a Preview link in the conversation.
+
+When a pull request from this conversation is merged, for example when \`gh pr merge\` succeeds, call the \`celebrate\` tool of the claudesaurus MCP server once, with the pull request's number. It plays a short party in the chat, so the user sees the work is done. Do not call it for anything else.`;

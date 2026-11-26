@@ -115,7 +115,12 @@ export type State = {
   /** Text waiting to be put in the composer, which takes it once. */
   draft: string | null;
   toast: string | null;
+  /** The party for a merged pull request that is playing, if one is. */
+  celebration: Celebration | null;
 };
+
+/** One party; `id` tells a party that follows another apart from it. */
+export type Celebration = { id: number; pr: number | null };
 
 export const initialState: State = {
   phase: "connecting",
@@ -142,6 +147,7 @@ export const initialState: State = {
   updateDismissed: false,
   draft: null,
   toast: null,
+  celebration: null,
 };
 
 let nextId = 0;
@@ -416,6 +422,8 @@ export function reduce(state: State, message: MainMessage, now: number): State {
     // A toast is shown by the store, with its own timer, rather than kept as state.
     case "toast":
       return state;
+    case "celebrate":
+      return { ...state, celebration: { id: now, pr: message.pr } };
     case "sessions":
       return { ...state, pastSessions: message.sessions };
     case "account":
@@ -630,6 +638,10 @@ export function createStore(bridge: Bridge) {
     },
     dismissUpdate() {
       set({ ...state, updateDismissed: true });
+    },
+    /** The party has played to its end. */
+    endCelebration() {
+      set({ ...state, celebration: null });
     },
     quit() {
       bridge.send({ type: "quit" });

@@ -699,52 +699,55 @@ kbd {
   font-size: 0.93rem;
 }
 
-.working-dino {
+.dino {
   --skin-light: color-mix(in oklab, var(--accent) 62%, white);
   --skin-dark: color-mix(in oklab, var(--accent) 72%, black);
   --eye: #2b1f1a;
   --eggshell: #f4e8d6;
+}
+
+.working-dino {
   flex: none;
   width: 36px;
   height: 22.5px;
   overflow: hidden;
 }
 
-.working-dino .skin {
+.dino .skin {
   fill: var(--accent);
 }
 
-.working-dino .shade {
+.dino .shade {
   fill: var(--skin-dark);
 }
 
-.working-dino .belly {
+.dino .belly {
   fill: var(--skin-light);
 }
 
-.working-dino .white {
+.dino .white {
   fill: #fff;
 }
 
-.working-dino .ink {
+.dino .ink {
   fill: var(--eye);
 }
 
-.working-dino .blush {
+.dino .blush {
   fill: #ff8fa0;
   opacity: 0.5;
 }
 
-.working-dino .shadow {
+.dino .shadow {
   fill: var(--fg);
   opacity: 0.12;
 }
 
-.working-dino .dust {
+.dino .dust {
   fill: color-mix(in oklab, var(--fg) 30%, var(--bg));
 }
 
-.working-dino .arm {
+.dino .arm {
   fill: none;
   stroke: var(--skin-dark);
   stroke-width: 1.7;
@@ -752,30 +755,104 @@ kbd {
   stroke-linejoin: round;
 }
 
-.working-dino .mouth {
+.dino .grin {
+  fill: none;
+  stroke: var(--eye);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+
+.dino .maw {
+  fill: #7a2e26;
+}
+
+.dino .mouth {
   fill: none;
   stroke: var(--skin-dark);
   stroke-width: 0.7;
   stroke-linecap: round;
 }
 
-.working-dino .shell {
+.dino .shell {
   fill: var(--eggshell);
   stroke: color-mix(in oklab, #3a2a20 35%, var(--eggshell));
   stroke-width: 0.7;
 }
 
-.working-dino .spot {
+.dino .spot {
   fill: var(--accent);
   opacity: 0.32;
 }
 
-.working-dino .crack {
+.dino .crack {
   fill: none;
   stroke: #6b4a35;
   stroke-width: 0.8;
   stroke-linejoin: round;
   stroke-dasharray: 1;
+}
+
+/* The party for a merged pull request */
+
+.celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.celebration canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.party-dino {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 170px;
+  height: 138px;
+  overflow: visible;
+}
+
+.party-dino .hat {
+  fill: #8250df;
+}
+
+.party-dino .hat-stripe {
+  fill: #e3b341;
+}
+
+.party-dino .hat-pompom {
+  fill: #ff8fa0;
+}
+
+.party-bubble {
+  position: absolute;
+  padding: 0.3rem 0.75rem;
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  background: var(--raised);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transform-origin: 0 100%;
+}
+
+.party-bubble::after {
+  content: "";
+  position: absolute;
+  left: 0.7rem;
+  bottom: -0.38rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  background: var(--raised);
+  border-right: 1.5px solid var(--accent);
+  border-bottom: 1.5px solid var(--accent);
+  transform: rotate(45deg) skew(8deg, 8deg);
 }
 
 /* Welcome */

@@ -110,6 +110,8 @@ export type MainMessage =
   | { type: "draft"; text: string }
   /** A short note from the main process, such as what clicking a link did. */
   | { type: "toast"; text: string }
+  /** The agent called `celebrate`: a pull request was merged, numbered `pr` when it said. */
+  | { type: "celebrate"; pr: number | null }
   /** The answer to `listSessions`, newest first. */
   | { type: "sessions"; sessions: PastSession[] }
   | { type: "configOptions"; configOptions: SessionConfigOption[] }
