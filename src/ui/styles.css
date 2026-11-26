@@ -192,23 +192,18 @@ kbd {
   font-weight: 550;
 }
 
-.chip,
-.plain-chip {
+.chip {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   height: 1.75rem;
   padding: 0 0.6rem;
-  border-radius: 999px;
-  font-size: 0.83rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.chip {
   border: 1px solid var(--line);
+  border-radius: 999px;
   background: var(--raised);
+  font-size: 0.83rem;
   color: var(--fg);
+  white-space: nowrap;
 }
 
 .chip:hover {
@@ -328,24 +323,6 @@ kbd {
 
 .effort-slider input:focus-visible::-webkit-slider-thumb {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--effort-color) 40%, transparent);
-}
-
-.plain-chip {
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.agent-chip {
-  font-family: var(--sans);
-}
-
-.agent-chip:hover {
-  background: var(--surface-strong);
-  color: var(--fg);
 }
 
 .badge {
@@ -1090,7 +1067,80 @@ kbd {
   position: relative;
 }
 
+.composer-shelf {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0.9rem -1px;
+  padding: 0.3rem 0.65rem 0.35rem;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 11px 11px 0 0;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.shelf-cwd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.77rem;
+  color: var(--muted);
+}
+
+.shelf-cwd svg {
+  flex-shrink: 0;
+  color: var(--faint);
+}
+
+.shelf-cwd-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shelf-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 1.45rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.shelf-button:hover {
+  background: var(--surface-strong);
+  color: var(--fg);
+}
+
+.shelf-button svg:last-child {
+  color: var(--faint);
+}
+
+.shelf-model {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.shelf-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--faint);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
 .composer {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--raised);
@@ -1122,6 +1172,14 @@ kbd {
   align-items: center;
   gap: 0.4rem;
   min-width: 0;
+}
+
+.composer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .spacer {
