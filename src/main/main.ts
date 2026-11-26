@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import type { McpServer } from "@agentclientprotocol/sdk";
 import { z } from "zod";
 import { MAIN_CHANNEL, type MainMessage, UI_CHANNEL, type UiMessage } from "../shared/protocol";
 import { type Agent, createAgent, type ResumeTarget } from "./agent";
@@ -64,10 +65,14 @@ const flags = FlagsSchema.parse(values);
 /** A task the PR viewer left for this chat, put in the composer the first time the page loads. */
 let draft = takeDraftFile(flags["draft-file"]);
 
-/** Tasks from a PR viewer this chat opened, put in the composer as they arrive. */
-const chatSocket = createChatSocket((text) => {
-  if (pageReady) view.webContents.send(MAIN_CHANNEL, { type: "draft", text } satisfies MainMessage);
-  else draft = text;
+/**
+ * Tasks from a PR viewer this chat opened, put in the composer as they arrive, and the agent's
+ * `celebrate` calls, played on the page as they come.
+ */
+const chatSocket = createChatSocket((message) => {
+  if (message.type === "celebrate") emit(message);
+  else if (pageReady) view.webContents.send(MAIN_CHANNEL, message satisfies MainMessage);
+  else draft = message.text;
 });
 
 /** Session settings given on the command line, by name. */
@@ -195,8 +200,8 @@ function emit(message: MainMessage) {
       usageStore.set(sessionId, { used: message.update.used, size: message.update.size });
     }
   }
-  // A list answers one request; a page that reloads asks again.
-  if (message.type !== "sessions" && message.type !== "agents") history.push(message);
+  // A list answers one request, and a page that reloads asks again. A party happens once.
+  if (!["sessions", "agents", "celebrate"].includes(message.type)) history.push(message);
   if (pageReady) view.webContents.send(MAIN_CHANNEL, message);
   if (message.type === "historyLoaded") restoreUsage();
 }
@@ -212,6 +217,16 @@ const claude = {
   nodePath: process.env.CLAUDESAURUS_NODE ?? "node",
   adapterEntry: path.join(path.dirname(adapterPackage), "dist", "index.js"),
 };
+
+/** The MCP server with the `celebrate` tool, which reaches this chat through its socket. */
+function celebrateServer(): McpServer {
+  return {
+    name: "claudesaurus",
+    command: claude.nodePath,
+    args: [path.join(__dirname, "celebrate.cjs")],
+    env: [{ name: "CLAUDESAURUS_CHAT_SOCKET", value: chatSocket.path() }],
+  };
+}
 
 /** `--agent` picks the agent for this run; otherwise the one last picked with `/agent`. */
 const firstAgentId = resolveAgentId(flags.agent ?? settings.agent);
@@ -234,6 +249,7 @@ function startAgent(
     startupConfig: config,
     resume,
     systemPromptAppend: SYSTEM_PROMPT_APPEND,
+    mcpServers: [celebrateServer()],
     openTerminal: (command, label) => openRexPane(command, cwd, label),
     emit,
   });

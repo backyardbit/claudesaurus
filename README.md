@@ -94,6 +94,13 @@ Every session adds a note to Claude's system prompt (`src/main/systemPrompt.ts`)
 chat can draw, so Claude answers "show me" with an inline `html` block instead of writing a file.
 An agent that takes no system prompt gets the note with the session's first message instead.
 
+Every session also gets a small MCP server, `claudesaurus` (`src/main/celebrateServer.ts`), with
+one tool, `celebrate`. The note asks the agent to call it once a pull request from the
+conversation is merged. The tool tells the chat through its socket, and the dinosaur runs in
+along the composer in a party hat and roars while confetti cannons fire from the composer's
+corners. A chat cannot tell from outside when the work in a thread is done; the agent can. The
+tool needs no permission, and a reopened session does not play the party again.
+
 A Markdown image of a video file, `![demo](/abs/path/demo.mp4)`, is shown as a player, so Claude
 can show you a recording it made. It plays MP4 and MOV (H.264, HEVC, AV1) and WebM (VP8, VP9,
 AV1), never starts by itself, and pauses when scrolled out of view, since every frame it plays is
@@ -215,7 +222,10 @@ machine to the Rex app. So the page avoids changes that are not needed: its one 
 dinosaur that hatches and grows up while Claude works, at twelve frames a second, and it shows
 streamed text in steps of 80 ms. On a 1440x1749 pane a running turn drew about 19,800 more rows a
 second than the idle pane, against 10,900 at eight frames and 7,000 for the four-frame pixel
-sprite before it; nothing is drawn for it between turns. During a turn the view follows the newest line, which drew about a quarter more
+sprite before it; nothing is drawn for it between turns. The party for a merged pull request runs at thirty
+frames a second for about seven seconds, since confetti stutters at twelve: on a 1200x1750 pane
+it drew up to 91,000 rows a second against 3,500 idle, about 390,000 rows in all, which is what
+twenty seconds of the working dinosaur costs. During a turn the view follows the newest line, which drew about a quarter more
 than moving it a page at a time, measured as rows drawn per word of a reply; the page jumps left
 most of the pane empty below the newest line.
 

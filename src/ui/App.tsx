@@ -1,6 +1,7 @@
 import { ArrowDown, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AuthPrompt } from "./components/AuthPrompt";
+import { Celebration } from "./components/Celebration";
 import { Composer } from "./components/Composer";
 import { PlanPill } from "./components/PlanPill";
 import { Timeline } from "./components/Timeline";
@@ -46,6 +47,8 @@ export function App() {
   const zen = useAppState((state) => state.zen);
   const agentName = useAppState((state) => state.agent?.name ?? "The agent");
   const auth = useAppState((state) => (state.phase === "auth" ? state.auth : null));
+  const celebration = useAppState((state) => state.celebration);
+  const actions = useActions();
 
   const scroller = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
@@ -145,6 +148,9 @@ export function App() {
       </div>
       {toast && <div className="toast">{toast}</div>}
       <UpdateToast />
+      {celebration && (
+        <Celebration key={celebration.id} pr={celebration.pr} onEnd={actions.endCelebration} />
+      )}
     </div>
   );
 }

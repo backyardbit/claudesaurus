@@ -4,24 +4,33 @@ import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 
-/** One task a PR viewer hands this chat: a line of JSON on the chat's socket. */
-const DraftMessageSchema = z.object({ type: z.literal("draft"), text: z.string() });
+/**
+ * One line of JSON on a chat's socket: a task a PR viewer hands the chat, or word from the
+ * chat's `celebrate` tool that a pull request was merged.
+ */
+const ChatMessageSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("draft"), text: z.string() }),
+  z.object({ type: z.literal("celebrate"), pr: z.number().int().nullable() }),
+]);
 
-function draftText(line: string) {
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+function parseMessage(line: string) {
   try {
-    const parsed = DraftMessageSchema.safeParse(JSON.parse(line));
-    return parsed.success ? parsed.data.text : null;
+    const parsed = ChatMessageSchema.safeParse(JSON.parse(line));
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
 }
 
 /**
- * A socket a PR viewer opened from this chat writes tasks to, so they land in this chat's
- * composer the way T3 Code puts them in the thread its pull request panel sits beside. It lives
- * in a folder only this user can read, and is made the first time a viewer is opened.
+ * A socket that programs started for this chat write to: a PR viewer it opened, which puts tasks
+ * in its composer the way T3 Code puts them in the thread its pull request panel sits beside,
+ * and the agent's `celebrate` tool. It lives in a folder only this user can read, and is made the
+ * first time it is asked for.
  */
-export function createChatSocket(onDraft: (text: string) => void) {
+export function createChatSocket(onMessage: (message: ChatMessage) => void) {
   let socketPath: string | null = null;
   let server: net.Server | null = null;
 
@@ -38,12 +47,12 @@ export function createChatSocket(onDraft: (text: string) => void) {
           buffer += chunk;
           const end = buffer.indexOf("\n");
           if (end === -1) return;
-          const text = draftText(buffer.slice(0, end));
-          if (text !== null) onDraft(text);
-          connection.end(text === null ? "refused\n" : "ok\n");
+          const message = parseMessage(buffer.slice(0, end));
+          if (message) onMessage(message);
+          connection.end(message ? "ok\n" : "refused\n");
         });
         connection.on("error", () => {
-          // A viewer that went away mid-message has nothing left to tell.
+          // A sender that went away mid-message has nothing left to tell.
         });
       });
       server.listen(socketPath);
@@ -56,20 +65,18 @@ export function createChatSocket(onDraft: (text: string) => void) {
   };
 }
 
-/** Hands `text` to the chat listening at `socketPath`; rejects when that chat is gone. */
-export function sendDraftToChat(socketPath: string, text: string) {
+/** Hands `message` to the chat listening at `socketPath`; rejects when that chat is gone. */
+export function sendToChat(socketPath: string, message: ChatMessage) {
   return new Promise<void>((resolve, reject) => {
     const connection = net.createConnection(socketPath);
     let answer = "";
     connection.setEncoding("utf8");
-    connection.on("connect", () =>
-      connection.write(`${JSON.stringify({ type: "draft", text })}\n`),
-    );
+    connection.on("connect", () => connection.write(`${JSON.stringify(message)}\n`));
     connection.on("data", (chunk) => {
       answer += chunk;
     });
     connection.on("end", () =>
-      answer.trim() === "ok" ? resolve() : reject(new Error("The chat refused the task.")),
+      answer.trim() === "ok" ? resolve() : reject(new Error("The chat refused the message.")),
     );
     connection.on("error", reject);
   });

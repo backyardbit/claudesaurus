@@ -6,11 +6,14 @@ import {
   type ClientConnection,
   type ContentBlock,
   client,
+  type McpServer,
   methods,
   ndJsonStream,
+  type PermissionOption,
   type RequestPermissionResponse,
   type SessionConfigOption,
   type SystemPrompt,
+  type ToolCallUpdate,
 } from "@agentclientprotocol/sdk";
 import { z } from "zod";
 import type {
@@ -44,6 +47,8 @@ export type AgentOptions = {
   resume: ResumeTarget | null;
   /** Text for the agent's system prompt, describing what this client can display. */
   systemPromptAppend: string;
+  /** MCP servers every session gets, such as the one with the `celebrate` tool. */
+  mcpServers: McpServer[];
   /**
    * Opens a terminal pane running the command, for a login the agent does in a terminal, and
    * resolves to whether it succeeded once it exits. Null where no pane can be opened.
@@ -158,6 +163,8 @@ export function createAgent(options: AgentOptions) {
         emit({ type: "update", update: params.update });
       })
       .onRequest(methods.client.session.requestPermission, ({ params, signal }) => {
+        const allow = isCelebrateCall(params.toolCall) ? allowOption(params.options) : null;
+        if (allow) return { outcome: { outcome: "selected", optionId: allow.optionId } };
         const requestId = randomUUID();
         return new Promise<RequestPermissionResponse>((resolve) => {
           pendingPermissions.set(requestId, resolve);
@@ -237,7 +244,7 @@ export function createAgent(options: AgentOptions) {
   async function openSession(active: ClientConnection) {
     const session = await active.agent.request(methods.agent.session.new, {
       cwd: options.cwd,
-      mcpServers: [],
+      mcpServers: options.mcpServers,
       ...promptFields(),
     });
     announce(session.sessionId, session.configOptions ?? [], false);
@@ -250,7 +257,7 @@ export function createAgent(options: AgentOptions) {
     const session = await active.agent.request(methods.agent.session.load, {
       sessionId: id,
       cwd: options.cwd,
-      mcpServers: [],
+      mcpServers: options.mcpServers,
       ...promptFields(),
     });
     emit({ type: "historyLoaded" });
@@ -542,6 +549,32 @@ export function createAgent(options: AgentOptions) {
 }
 
 export type Agent = ReturnType<typeof createAgent>;
+
+/** Where Claude reports the tool call's tool, by its full MCP name. */
+const ClaudeToolMetaSchema = z.object({ claudeCode: z.object({ toolName: z.string() }) });
+
+/** Where Antigravity reports an MCP tool call's server and tool. */
+const McpToolMetaSchema = z.object({ mcp: z.object({ server: z.string(), tool: z.string() }) });
+
+/** Titles agents give the call when they name its tool in no other way. */
+const CELEBRATE_TITLES = new Set(["claudesaurus: celebrate", "claudesaurus_celebrate"]);
+
+/**
+ * Whether a tool call is the `celebrate` tool Claudesaurus serves, which does nothing but play an
+ * animation and so needs no one's permission.
+ */
+export function isCelebrateCall(toolCall: ToolCallUpdate) {
+  const claude = ClaudeToolMetaSchema.safeParse(toolCall._meta);
+  if (claude.success) return claude.data.claudeCode.toolName === "mcp__claudesaurus__celebrate";
+  const mcp = McpToolMetaSchema.safeParse(toolCall._meta);
+  if (mcp.success)
+    return mcp.data.mcp.server === "claudesaurus" && mcp.data.mcp.tool === "celebrate";
+  return CELEBRATE_TITLES.has(toolCall.title ?? "");
+}
+
+function allowOption(permissionOptions: PermissionOption[]) {
+  return permissionOptions.find((option) => option.kind === "allow_once") ?? null;
+}
 
 function authChoice(method: AuthMethod): AuthChoice {
   return {

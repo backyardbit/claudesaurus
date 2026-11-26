@@ -361,6 +361,10 @@ export function createMockBridge(): Bridge {
             },
           ],
           [600, { type: "turnEnded", stopReason: "end_turn" }],
+          // Mentioning a merge plays the party, as the agent's `celebrate` tool would.
+          ...(/merge/i.test(message.text)
+            ? [[0, { type: "celebrate", pr: 28 }] satisfies [number, MainMessage]]
+            : []),
         ]);
         break;
       case "steer":

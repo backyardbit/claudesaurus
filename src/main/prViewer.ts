@@ -3,7 +3,7 @@ import path from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { z } from "zod";
 import { PR_CHANNEL, PULL_REQUEST_METHODS } from "../shared/pr";
-import { sendDraftToChat } from "./chatSocket";
+import { sendToChat } from "./chatSocket";
 import { startDebugCapture } from "./debug";
 import { openPage } from "./page";
 import { createGitHub, resolvePullRequestTarget } from "./pr/github";
@@ -51,7 +51,7 @@ async function handToChat(
 ) {
   if (chat && where.prompt !== null) {
     try {
-      await sendDraftToChat(chat.socket, where.prompt);
+      await sendToChat(chat.socket, { type: "draft", text: where.prompt });
       if (chat.block) await focusPane(chat.block);
       return "opened-from" as const;
     } catch {
