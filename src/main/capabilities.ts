@@ -31,10 +31,33 @@ const STARTUP_CATEGORIES = new Map([
   ["mode", "mode"],
 ]);
 
+function selectChoices(option: SessionConfigOption) {
+  if (option.type !== "select") return [];
+  return option.options.flatMap((entry) => ("options" in entry ? entry.options : [entry]));
+}
+
+/**
+ * Resolves a requested value against a select option's listed choices (by value or display name,
+ * case-insensitively). Returns null when the option lists choices and none match, so a setting
+ * meant for another agent (such as `--model haiku` on Antigravity) is not sent to fail.
+ */
+function matchOptionValue(option: SessionConfigOption, value: string): string | null {
+  const choices = selectChoices(option);
+  if (choices.length === 0) return value;
+  const exact = choices.find((choice) => choice.value === value);
+  if (exact) return exact.value;
+  const lower = value.toLowerCase();
+  const matched =
+    choices.find((choice) => choice.value.toLowerCase() === lower) ??
+    choices.find((choice) => choice.name.toLowerCase() === lower);
+  return matched ? matched.value : null;
+}
+
 /**
  * Matches the settings given on the command line (`--model`, `--effort`, `--mode`) to the
  * session's config options: the option with the same id, or else the one in the same
- * category. A setting the session has no option for is skipped.
+ * category. A setting the session has no option for is skipped; a value not offered by the
+ * agent's choices is left at the agent's default without error.
  */
 export function pickStartupConfig(
   requested: ReadonlyMap<string, string>,
@@ -47,8 +70,12 @@ export function pickStartupConfig(
     const option =
       options.find((candidate) => candidate.id === name) ??
       options.find((candidate) => candidate.category === category);
-    if (option) applied.push({ configId: option.id, value });
-    else skipped.push(name);
+    if (!option) {
+      skipped.push(name);
+      continue;
+    }
+    const resolved = matchOptionValue(option, value);
+    if (resolved !== null) applied.push({ configId: option.id, value: resolved });
   }
   return { applied, skipped };
 }
