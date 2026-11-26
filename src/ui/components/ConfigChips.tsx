@@ -42,10 +42,32 @@ function chipIcon(category: SessionConfigOption["category"]): LucideIcon | undef
   }
 }
 
-/** The options that get their own chip, by ACP category, in display order. */
-const PRIMARY_CATEGORIES = ["model", "thought_level", "mode"];
+/** The options that get their own chip inside the composer bar, by ACP category, in display order. */
+const BAR_CATEGORIES = ["thought_level", "mode"];
 
-function SelectChip({ option }: { option: SessionConfigOption }) {
+/** Model pickers live on the shelf above the composer rather than inside the prompt bar. */
+export function modelOptions(options: SessionConfigOption[]) {
+  return options.filter((option) => option.category === "model" && option.type === "select");
+}
+
+/** Splits the non-model options into composer-bar chips and the overflow settings popover. */
+export function barConfigOptions(options: SessionConfigOption[]) {
+  const models = new Set(modelOptions(options));
+  const primary = BAR_CATEGORIES.flatMap((category) =>
+    options.filter((option) => option.category === category && option.type === "select"),
+  );
+  const primarySet = new Set(primary);
+  const rest = options.filter((option) => !models.has(option) && !primarySet.has(option));
+  return { primary, rest };
+}
+
+type SelectChipProps = {
+  option: SessionConfigOption;
+  className?: string;
+  align?: "left" | "right";
+};
+
+export function SelectChip({ option, className = "chip", align = "left" }: SelectChipProps) {
   const actions = useActions();
   const [open, setOpen] = useState(false);
   const Icon = chipIcon(option.category);
@@ -53,8 +75,14 @@ function SelectChip({ option }: { option: SessionConfigOption }) {
     <Popover
       open={open}
       onClose={() => setOpen(false)}
+      align={align}
       trigger={
-        <button type="button" className="chip" title={option.name} onClick={() => setOpen(!open)}>
+        <button
+          type="button"
+          className={className}
+          title={option.name}
+          onClick={() => setOpen(!open)}
+        >
           {Icon && <Icon size={13} />}
           <span>{currentName(option)}</span>
           <ChevronDown size={12} />
@@ -144,10 +172,7 @@ function MoreSettings({ options }: { options: SessionConfigOption[] }) {
 }
 
 export function ConfigChips({ options }: { options: SessionConfigOption[] }) {
-  const primary = PRIMARY_CATEGORIES.flatMap((category) =>
-    options.filter((option) => option.category === category && option.type === "select"),
-  );
-  const rest = options.filter((option) => !primary.includes(option));
+  const { primary, rest } = barConfigOptions(options);
   return (
     <>
       {primary.map((option) =>

@@ -1,5 +1,5 @@
 import type { AvailableCommand } from "@agentclientprotocol/sdk";
-import { ArrowUp, Bot, CornerDownLeft, Folder, Leaf, Square, X } from "lucide-react";
+import { ArrowUp, Bot, ChevronDown, CornerDownLeft, Folder, Leaf, Square, X } from "lucide-react";
 import {
   type ClipboardEvent,
   type KeyboardEvent,
@@ -12,7 +12,7 @@ import {
 import type { AgentChoice, PastSession, PromptImage } from "../../shared/protocol";
 import { formatAge, shortPath } from "../format";
 import { useActions, useAppState } from "../store";
-import { ConfigChips } from "./ConfigChips";
+import { ConfigChips, modelOptions, SelectChip } from "./ConfigChips";
 import { ContextChip } from "./ContextChip";
 
 const MAX_COMMANDS = 10;
@@ -147,9 +147,9 @@ export function Composer() {
   const pastSessions = useAppState((state) => state.pastSessions);
   const pendingPermission = useAppState((state) => state.permissions[0] ?? null);
   const zen = useAppState((state) => state.zen);
+  const updateVersion = useAppState((state) => state.updateVersion);
   const agent = useAppState((state) => state.agent);
   const agents = useAppState((state) => state.agents);
-  const updateVersion = useAppState((state) => state.updateVersion);
   const auth = useAppState((state) => (state.phase === "auth" ? state.auth : null));
   const canResume = session?.features.resume ?? false;
   const agentName = agent?.name ?? "the agent";
@@ -443,6 +443,9 @@ export function Composer() {
     setImages((current) => [...current, ...pasted]);
   }
 
+  const models = modelOptions(configOptions);
+  const showShelf = session !== null || agent !== null || models.length > 0;
+
   return (
     <div className="composer-wrap">
       {queue.length > 0 && (
@@ -488,6 +491,43 @@ export function Composer() {
               <span className={`menu-name ${entry.mono ? "mono" : ""}`}>{entry.name}</span>
               <span className="menu-description">{entry.detail}</span>
             </button>
+          ))}
+        </div>
+      )}
+      {showShelf && (
+        <div className="composer-shelf">
+          {session ? (
+            <span className="shelf-cwd" title={session.cwd}>
+              <Folder size={13} />
+              <span className="shelf-cwd-text">{shortPath(session.cwd)}</span>
+            </span>
+          ) : (
+            <span className="spacer" />
+          )}
+          {agent && (
+            <button
+              type="button"
+              className="shelf-button"
+              title="Switch agent (/agent)"
+              onClick={() => {
+                setText("/agent ");
+                setMenuDismissed(false);
+                input.current?.focus();
+              }}
+            >
+              <Bot size={13} />
+              <span>{agent.name}</span>
+              <ChevronDown size={12} />
+            </button>
+          )}
+          {agent && models.length > 0 && <span className="shelf-dot" aria-hidden />}
+          {models.map((option) => (
+            <SelectChip
+              key={option.id}
+              option={option}
+              className="shelf-button shelf-model"
+              align="right"
+            />
           ))}
         </div>
       )}
@@ -542,42 +582,29 @@ export function Composer() {
               <Leaf size={13} /> Zen
             </button>
           )}
-          {agent && (
-            <button
-              type="button"
-              className="plain-chip agent-chip"
-              title="Switch agent (/agent)"
-              onClick={() => {
-                setText("/agent ");
-                setMenuDismissed(false);
-                input.current?.focus();
-              }}
-            >
-              <Bot size={13} /> {agent.name}
-            </button>
-          )}
-          {session && (
-            <span className="plain-chip" title={session.cwd}>
-              <Folder size={13} /> {shortPath(session.cwd)}
-            </span>
-          )}
-          <span className="spacer" />
-          <ContextChip />
-          {running && !canSend ? (
-            <button type="button" className="send stop" title="Stop (esc)" onClick={actions.cancel}>
-              <Square size={13} fill="currentColor" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="send"
-              title={running ? "Queue message (ctrl+enter sends now)" : "Send"}
-              disabled={!canSend}
-              onClick={() => submit()}
-            >
-              <ArrowUp size={16} />
-            </button>
-          )}
+          <div className="composer-actions">
+            <ContextChip />
+            {running && !canSend ? (
+              <button
+                type="button"
+                className="send stop"
+                title="Stop (esc)"
+                onClick={actions.cancel}
+              >
+                <Square size={13} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="send"
+                title={running ? "Queue message (ctrl+enter sends now)" : "Send"}
+                disabled={!canSend}
+                onClick={() => submit()}
+              >
+                <ArrowUp size={16} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
