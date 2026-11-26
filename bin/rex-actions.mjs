@@ -32,7 +32,8 @@ function withBlock(config, block) {
 
 /** Makes Rex load the changed config; a Rex that is not running reads it when it starts. */
 function reloadRex() {
-  execFile("rex", ["--autostart=false", "config", "reload"], () => {});
+  const { OSC7577_TOKEN: _unused, ...env } = process.env;
+  execFile("rex", ["--autostart=false", "config", "reload"], { env }, () => {});
 }
 
 /**

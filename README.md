@@ -208,6 +208,17 @@ agent's own program name, so Rex shows its icon: `claude-code` for Claude, `code
 When a turn finishes, fails or needs permission while the pane is not focused, it also sends a
 desktop notification (OSC 777). `rex block call -b BLOCK program_status` shows the current record.
 
+Claudesaurus also reports how to bring a chat or pull request pane back after a terminal or Rex
+server restart using the
+[Program Resume Protocol](https://www.superlogical.com/rex/docs/build/program-resume) (OSC 7577,
+`src/main/resume.ts`). When the terminal sets `OSC7577_TOKEN`, Claudesaurus strips the token from
+child processes, keeps the pane's current agent and session (or pull request target) in a
+user-only state file under `~/.local/state/claudesaurus/resume/`, and reports `--resume-file`
+with that path. `rex/claudesaurus.lua` automatically registers a `resume.trust.claudesaurus` rule
+in Rex when the server supports resume rules; override or disable it in `~/.config/rex/init.lua`
+after the Claudesaurus block. Intentional quits (`Ctrl+Q`, `/quit`) remove the state file and
+send `clear=1`; terminal shutdowns (`SIGHUP`/`SIGTERM`) keep it so the pane resumes.
+
 ## Performance
 
 Every change on the page is drawn again in the terminal, and with Rex each frame travels from this

@@ -58,23 +58,37 @@ end
 
 function M.setup(opts)
   local command = (opts or {}).command or { "claudesaurus" }
-  if not (rex and rex.action) then return end
-  rex.action{
-    name = "claudesaurus_split_horizontal",
-    title = "Claudesaurus: Open in Horizontal Split",
-    description = "Open Claudesaurus in a new pane to the right, in this pane's folder",
-    category = "Claudesaurus",
-    keywords = "claude chat split right beside side by side",
-    run = function(ctx) open(ctx, command, "horizontal") end,
-  }
-  rex.action{
-    name = "claudesaurus_split_vertical",
-    title = "Claudesaurus: Open in Vertical Split",
-    description = "Open Claudesaurus in a new pane below, in this pane's folder",
-    category = "Claudesaurus",
-    keywords = "claude chat split below under stacked",
-    run = function(ctx) open(ctx, command, "vertical") end,
-  }
+  if rex and rex.action then
+    rex.action{
+      name = "claudesaurus_split_horizontal",
+      title = "Claudesaurus: Open in Horizontal Split",
+      description = "Open Claudesaurus in a new pane to the right, in this pane's folder",
+      category = "Claudesaurus",
+      keywords = "claude chat split right beside side by side",
+      run = function(ctx) open(ctx, command, "horizontal") end,
+    }
+    rex.action{
+      name = "claudesaurus_split_vertical",
+      title = "Claudesaurus: Open in Vertical Split",
+      description = "Open Claudesaurus in a new pane below, in this pane's folder",
+      category = "Claudesaurus",
+      keywords = "claude chat split below under stacked",
+      run = function(ctx) open(ctx, command, "vertical") end,
+    }
+  end
+  if rex and rex.set and rex.match and rex.match.under then
+    local state_home = os.getenv("XDG_STATE_HOME")
+    local resume_dir = (type(state_home) == "string" and state_home:sub(1, 1) == "/")
+      and (state_home .. "/claudesaurus/resume")
+      or "~/.local/state/claudesaurus/resume"
+    local resume_command = {}
+    for i, part in ipairs(command) do
+      resume_command[i] = part
+    end
+    resume_command[#resume_command + 1] = "--resume-file"
+    resume_command[#resume_command + 1] = rex.match.under(resume_dir)
+    rex.set("resume.trust.claudesaurus", { command = resume_command })
+  end
 end
 
 return M

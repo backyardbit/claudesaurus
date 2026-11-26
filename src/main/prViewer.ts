@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { z } from "zod";
@@ -8,6 +9,7 @@ import { startDebugCapture } from "./debug";
 import { openPage } from "./page";
 import { createGitHub, resolvePullRequestTarget } from "./pr/github";
 import { checkOutPullRequest } from "./prCheckout";
+import { createResumeReporter, ownerPid, resumeCommand, takeResumeToken } from "./resume";
 import { focusPane, openChatPane } from "./rexPanes";
 
 /**
@@ -18,6 +20,15 @@ import { focusPane, openChatPane } from "./rexPanes";
 
 const run = promisify(execFile);
 const cwd = process.cwd();
+const resumeToken = takeResumeToken();
+
+function writeToTerminal(sequence: string) {
+  try {
+    fs.writeSync(process.stdout.fd, sequence);
+  } catch {
+    // Resume reports are a courtesy; a terminal that cannot take one must not stop the viewer.
+  }
+}
 
 /** The pull request of the branch checked out here, as `gh pr view` finds it. */
 async function currentBranchPullRequest() {
@@ -86,13 +97,26 @@ async function main() {
     cwd,
   );
   const github = createGitHub({ cwd });
+  const resume = createResumeReporter({
+    write: writeToTerminal,
+    token: resumeToken,
+    pid: ownerPid(),
+    command: resumeCommand(),
+    cwd,
+  });
+  const target = `${reference.repository}#${reference.number}`;
+  resume.update({ version: 1, kind: "pr", target });
+  process.on("SIGCONT", () => resume.rereport());
 
   const { root, view } = openPage({
-    name: `${reference.repository}#${reference.number}`,
+    name: target,
     html: path.join("pr", "index.html"),
-    onQuit: () => root.stop(),
+    onQuit: () => {
+      resume.clear();
+      root.stop();
+    },
   });
-  root.setTitle(`${reference.repository}#${reference.number}`);
+  root.setTitle(target);
   const debugDirectory = process.env.CLAUDESAURUS_DEBUG_DIR;
   const debug = debugDirectory ? startDebugCapture(debugDirectory, view.webContents) : null;
   if (debugDirectory) {
@@ -133,7 +157,10 @@ async function main() {
   view.webContents.ipc.on(PR_CHANNEL, (event, operation: string, text) => {
     if (event.senderFrame !== view.webContents.mainFrame) return;
     if (operation === "copy") root.setClipboard(z.string().parse(text));
-    if (operation === "quit") root.stop();
+    if (operation === "quit") {
+      resume.clear();
+      root.stop();
+    }
   });
 }
 

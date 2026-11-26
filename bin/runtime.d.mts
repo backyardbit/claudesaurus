@@ -15,4 +15,6 @@ export function latestInstalledVersion(
   afterVersion: string,
 ): { version: string; root: string } | null;
 export function restartArgs(previousArgs: string[], request: RestartRequest): string[];
+export function envWithoutResumeToken(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv;
+export function resolveResumeFileArgs(args: string[]): string[];
 export function prepareRuntime(appRoot: string, version: string): string;

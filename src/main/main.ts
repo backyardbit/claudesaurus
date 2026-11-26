@@ -10,6 +10,14 @@ import { agentChoices, openRexPane, prepareLaunch } from "./launch";
 import { openPage } from "./page";
 import { agentName, resolveAgentId } from "./registry";
 import { createReplayAgent } from "./replay";
+import {
+  createResumeReporter,
+  OSC7577_TOKEN_ENV,
+  ownerPid,
+  type ResumeState,
+  resumeCommand,
+  takeResumeToken,
+} from "./resume";
 import { openPullRequestPane, rexBlock, takeDraftFile } from "./rexPanes";
 import { loadSettings, saveSettings } from "./settings";
 import { createStatusReporter } from "./status";
@@ -18,6 +26,7 @@ import { type ReadyUpdate, startAutoUpdater } from "./updater";
 import { createUsageStore } from "./usageStore";
 
 const cwd = process.cwd();
+const resumeToken = takeResumeToken();
 
 const GITHUB_PULL_REQUEST_URL = /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/;
 
@@ -27,6 +36,7 @@ const RUNTIME_ENV_PREFIXES = ["ELECTRON_", "PIXEL_", "CHROME_"];
 function agentEnv() {
   const env: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
+    if (key === OSC7577_TOKEN_ENV) continue;
     if (RUNTIME_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
     env[key] = value;
   }
@@ -99,6 +109,14 @@ function writeToTerminal(sequence: string) {
 }
 
 const status = createStatusReporter(writeToTerminal);
+const resume = createResumeReporter({
+  write: writeToTerminal,
+  token: process.env.CLAUDESAURUS_REPLAY ? null : resumeToken,
+  pid: ownerPid(),
+  command: resumeCommand(),
+  cwd,
+});
+process.on("SIGCONT", () => resume.rereport());
 const usageStore = createUsageStore();
 
 const { root, view } = openPage({
@@ -146,6 +164,7 @@ let pageReady = false;
 let sessionId: string | null = null;
 let canResumeSession = false;
 let hasConversation = false;
+let pendingResumeId: string | null = flags.resume ?? null;
 let readyUpdate: ReadyUpdate | null = null;
 
 function readAppVersion() {
@@ -160,33 +179,56 @@ function readAppVersion() {
   }
 }
 
+function reportResume() {
+  const activeSession = (canResumeSession && hasConversation ? sessionId : null) ?? pendingResumeId;
+  const state: ResumeState = {
+    version: 1,
+    kind: "chat",
+    agentId: currentAgentId,
+    sessionId: activeSession,
+  };
+  if (activeSession === null && currentAgentId === firstAgentId) {
+    if (flags.model) state.model = flags.model;
+    if (flags.effort) state.effort = flags.effort;
+    if (flags.mode) state.mode = flags.mode;
+  }
+  resume.update(state);
+}
+
 function emit(message: MainMessage) {
   debug?.record(message);
   status.observe(message);
   // Another agent starting replaces everything shown before, and its progress replaces itself.
   if (message.type === "connecting") {
     history = [];
+    currentAgentId = message.agent.id;
     sessionId = null;
     canResumeSession = false;
     hasConversation = false;
+    reportResume();
   }
   if (message.type === "session") {
+    pendingResumeId = null;
     sessionId = message.session.sessionId;
     currentAgentId = message.session.agent.id;
     canResumeSession = message.session.features.resume;
     hasConversation = message.session.loadingHistory;
     history = history.filter((earlier) => earlier.type === "account");
     root.setTitle("Claudesaurus");
+    reportResume();
   }
   if (message.type === "userMessage") {
     hasConversation = true;
+    reportResume();
   }
   if (message.type === "update") {
     if (
-      message.update.sessionUpdate === "user_message_chunk" ||
-      message.update.sessionUpdate === "agent_message_chunk"
+      !hasConversation &&
+      (message.update.sessionUpdate === "user_message_chunk" ||
+        message.update.sessionUpdate === "agent_message_chunk")
     ) {
       hasConversation = true;
+      reportResume();
     }
     if (message.update.sessionUpdate === "session_info_update" && message.update.title) {
       root.setTitle(`Claudesaurus · ${message.update.title}`);
@@ -249,6 +291,7 @@ if (process.env.CLAUDESAURUS_REPLAY) void agent.start();
 /** Starts a new session on another agent, and makes it the one the next launch starts with. */
 function switchAgent(nextId: string) {
   agent.dispose();
+  pendingResumeId = null;
   currentAgentId = nextId;
   settings.agent = nextId;
   saveSettings(settings);
@@ -287,12 +330,13 @@ const updater = autoUpdateEnabled
     })
   : null;
 
-function quit() {
+function quit(clearResume = true) {
   updater?.stop();
   debug?.stop();
   chatSocket.close();
   usageStore.flush();
   status.clear();
+  if (clearResume) resume.clear();
   agent.dispose();
   root.stop();
 }
@@ -314,7 +358,7 @@ function restart() {
     version: readyUpdate?.version ?? null,
   };
   fs.writeFileSync(restartFile, JSON.stringify(payload));
-  quit();
+  quit(false);
 }
 
 function toast(text: string) {
