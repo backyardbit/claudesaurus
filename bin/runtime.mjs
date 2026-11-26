@@ -143,6 +143,64 @@ export function restartArgs(previousArgs, request) {
   return kept;
 }
 
+/** Returns a copy of `env` with `OSC7577_TOKEN` removed so child processes cannot forge resume reports. */
+export function envWithoutResumeToken(env = process.env) {
+  const { OSC7577_TOKEN: _unused, ...clean } = env;
+  return clean;
+}
+
+function nonEmptyString(value) {
+  return String(value ?? "").length > 0 && value === String(value);
+}
+
+/**
+ * Expands `--resume-file PATH` (written by OSC 7577 resume reporting) into normal CLI arguments.
+ * Missing or unreadable files fall back to starting a normal session so resume is always safe.
+ */
+export function resolveResumeFileArgs(args) {
+  let file = null;
+  const remaining = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--resume-file") {
+      file = args[index + 1] ?? null;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--resume-file=")) {
+      file = arg.slice("--resume-file=".length);
+      continue;
+    }
+    remaining.push(arg);
+  }
+  if (!file) return args;
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+    const now = new Date();
+    fs.utimesSync(file, now, now);
+  } catch {
+    return remaining;
+  }
+  if (parsed?.version !== 1) return remaining;
+  if (parsed.kind === "pr" && nonEmptyString(parsed.target)) {
+    return ["pr", parsed.target, ...remaining];
+  }
+  if (parsed.kind === "chat" && nonEmptyString(parsed.agentId)) {
+    const resolved = ["--agent", parsed.agentId];
+    if (nonEmptyString(parsed.sessionId)) {
+      resolved.push("--resume", parsed.sessionId);
+    } else {
+      if (nonEmptyString(parsed.model)) resolved.push("--model", parsed.model);
+      if (nonEmptyString(parsed.effort)) resolved.push("--effort", parsed.effort);
+      if (nonEmptyString(parsed.mode)) resolved.push("--mode", parsed.mode);
+    }
+    return [...resolved, ...remaining];
+  }
+  return remaining;
+}
+
 /**
  * Returns the folder to run the app from: a copy of the app with its dependencies installed.
  * Creates it if this version has not been set up yet, which needs the network.
@@ -183,7 +241,7 @@ export function prepareRuntime(appRoot, version) {
       cwd: staging,
       stdio: ["ignore", "inherit", "inherit"],
       env: {
-        ...process.env,
+        ...envWithoutResumeToken(process.env),
         TMPDIR: temporary,
         PATH: `${nodeFolder}${path.delimiter}${process.env.PATH ?? ""}`,
       },

@@ -11,6 +11,7 @@ import {
   isRuntimeReady,
   latestInstalledVersion,
   prepareRuntime,
+  resolveResumeFileArgs,
   restartArgs,
   runtimeHome,
 } from "./runtime.mjs";
@@ -52,6 +53,10 @@ examples:
 const appRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { version } = JSON.parse(readFileSync(path.join(appRoot, "package.json"), "utf8"));
 const args = process.argv.slice(2);
+// The outermost launcher is the process attached directly to the user's shell (or PTY root), so
+// OSC 7577 reports its PID rather than Electron's and keeps ownership stable across delegation
+// and /restart.
+const ownerPid = process.env.CLAUDESAURUS_OWNER_PID || String(process.pid);
 
 const home = runtimeHome();
 const inRuntimeHome = isInsideDir(appRoot, home);
@@ -72,7 +77,12 @@ if (
   if (newerBin && existsSync(newerBin)) {
     const delegated = spawnSync(process.execPath, [newerBin, ...args], {
       stdio: "inherit",
-      env: { ...process.env, CLAUDESAURUS_PACKAGED: "1", CLAUDESAURUS_DELEGATED: "1" },
+      env: {
+        ...process.env,
+        CLAUDESAURUS_OWNER_PID: ownerPid,
+        CLAUDESAURUS_PACKAGED: "1",
+        CLAUDESAURUS_DELEGATED: "1",
+      },
     });
     process.exit(delegated.status ?? 1);
   }
@@ -124,7 +134,7 @@ if (args.includes("--setup")) {
 
 let currentRoot = initialRoot;
 let currentVersion = version;
-let currentArgs = args;
+let currentArgs = resolveResumeFileArgs(args);
 
 while (true) {
   // `claudesaurus pr` runs the pull request viewer, which has its own entry and never restarts.
@@ -150,6 +160,7 @@ while (true) {
     env: {
       ...process.env,
       CLAUDESAURUS_NODE: process.execPath,
+      CLAUDESAURUS_OWNER_PID: ownerPid,
       CLAUDESAURUS_COMMAND: JSON.stringify(command),
       CLAUDESAURUS_VERSION: currentVersion,
       CLAUDESAURUS_PACKAGED: packaged ? "1" : "0",
