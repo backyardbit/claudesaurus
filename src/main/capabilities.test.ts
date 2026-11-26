@@ -66,8 +66,19 @@ test("an agent that advertises nothing gets the baseline", () => {
   expect(steerOff.steer).toBe(false);
 });
 
-function select(id: string, category: string): SessionConfigOption {
-  return { id, name: id, category, type: "select", currentValue: "a", options: [] };
+function select(
+  id: string,
+  category: string,
+  choices: { value: string; name?: string }[] = [],
+): SessionConfigOption {
+  return {
+    id,
+    name: id,
+    category,
+    type: "select",
+    currentValue: choices[0]?.value ?? "a",
+    options: choices.map((choice) => ({ value: choice.value, name: choice.name ?? choice.value })),
+  };
 }
 
 test("applies command line settings to the options the session has", () => {
@@ -85,4 +96,32 @@ test("applies command line settings to the options the session has", () => {
     skipped: ["mode"],
   });
   expect(pickStartupConfig(new Map(), options)).toEqual({ applied: [], skipped: [] });
+});
+
+test("leaves out values the agent does not offer, such as a Claude model on Antigravity", () => {
+  const options = [
+    select("model", "model", [
+      { value: "gemini-3.8-flash", name: "Gemini 3.8 Flash" },
+      { value: "gemini-4-neon", name: "Gemini 4 Neon" },
+    ]),
+    select("thinking_level", "thought_level", [{ value: "low" }, { value: "high" }]),
+  ];
+  const requested = new Map([
+    ["model", "haiku"],
+    ["effort", "LOW"],
+  ]);
+  expect(pickStartupConfig(requested, options)).toEqual({
+    applied: [{ configId: "thinking_level", value: "low" }],
+    skipped: [],
+  });
+});
+
+test("matches a choice by display name when the value differs", () => {
+  const options = [
+    select("model", "model", [{ value: "gemini-3.8-flash", name: "Gemini 3.8 Flash" }]),
+  ];
+  expect(pickStartupConfig(new Map([["model", "Gemini 3.8 Flash"]]), options)).toEqual({
+    applied: [{ configId: "model", value: "gemini-3.8-flash" }],
+    skipped: [],
+  });
 });
