@@ -6,12 +6,14 @@ import {
   type ClientConnection,
   type ContentBlock,
   client,
+  type ListSessionsResponse,
   type McpServer,
   methods,
   ndJsonStream,
   type PermissionOption,
   type RequestPermissionResponse,
   type SessionConfigOption,
+  type SessionInfo,
   type SystemPrompt,
   type ToolCallUpdate,
 } from "@agentclientprotocol/sdk";
@@ -81,6 +83,13 @@ const AuthRequiredSchema = z.object({ code: z.literal(AUTH_REQUIRED) });
 
 /** Where the note on what the page draws comes from, for agents that take it as a prompt block. */
 const CONTEXT_URI = "claudesaurus://display-guide";
+
+/**
+ * The most pages of past sessions to read. Codex pages through every session it has and leaves
+ * out those from other folders, so this folder's older ones can be several pages in, after pages
+ * with none.
+ */
+const MAX_SESSION_PAGES = 20;
 
 /** The extension request that adds a message to the turn that is running. */
 const STEER_METHOD = "_session/steering";
@@ -267,9 +276,17 @@ export function createAgent(options: AgentOptions) {
 
   /** The sessions started in this directory, newest first. */
   async function pastSessions(active: ClientConnection): Promise<PastSession[]> {
-    const { sessions } = await active.agent.request(methods.agent.session.list, {
-      cwd: options.cwd,
-    });
+    const sessions: SessionInfo[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < MAX_SESSION_PAGES; page += 1) {
+      const listed: ListSessionsResponse = await active.agent.request(methods.agent.session.list, {
+        cwd: options.cwd,
+        cursor,
+      });
+      sessions.push(...listed.sessions);
+      cursor = listed.nextCursor ?? null;
+      if (!cursor) break;
+    }
     return sessions
       .map(({ sessionId, title, updatedAt }) => ({
         sessionId,
