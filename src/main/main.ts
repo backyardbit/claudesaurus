@@ -3,7 +3,13 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import type { McpServer } from "@agentclientprotocol/sdk";
 import { z } from "zod";
-import { MAIN_CHANNEL, type MainMessage, UI_CHANNEL, type UiMessage } from "../shared/protocol";
+import {
+  MAIN_CHANNEL,
+  type MainMessage,
+  type PastSession,
+  UI_CHANNEL,
+  type UiMessage,
+} from "../shared/protocol";
 import { type Agent, createAgent, type ResumeTarget } from "./agent";
 import { createChatSocket } from "./chatSocket";
 import { startDebugCapture } from "./debug";
@@ -20,11 +26,11 @@ import {
   takeResumeToken,
 } from "./resume";
 import { openPullRequestPane, rexBlock, takeDraftFile } from "./rexPanes";
+import { createSessionStore } from "./sessionStore";
 import { loadSettings, saveSettings } from "./settings";
 import { createStatusReporter } from "./status";
 import { SYSTEM_PROMPT_APPEND } from "./systemPrompt";
 import { type ReadyUpdate, startAutoUpdater } from "./updater";
-import { createUsageStore } from "./usageStore";
 
 const cwd = process.cwd();
 const resumeToken = takeResumeToken();
@@ -122,7 +128,7 @@ const resume = createResumeReporter({
   cwd,
 });
 process.on("SIGCONT", () => resume.rereport());
-const usageStore = createUsageStore();
+const sessionStore = createSessionStore();
 
 const { root, view } = openPage({
   name: "Claudesaurus",
@@ -184,6 +190,41 @@ function readAppVersion() {
   }
 }
 
+/** How long a title made from the first thing asked in a session may be. */
+const PROMPT_TITLE_LENGTH = 80;
+
+function promptTitle(text: string) {
+  const line = text.replace(/\s+/g, " ").trim();
+  return line.length > PROMPT_TITLE_LENGTH ? `${line.slice(0, PROMPT_TITLE_LENGTH - 1)}…` : line;
+}
+
+/**
+ * Past sessions with what this app remembers of them filled in: the agent's title, or the first
+ * thing asked, where the agent lists none (Grok) or only a placeholder (Antigravity); and when
+ * the session was last used, where the agent does not say.
+ */
+function describeSessions(sessions: PastSession[]): PastSession[] {
+  const described = sessions.map((past) => {
+    const stored = sessionStore.get(past.sessionId);
+    return {
+      ...past,
+      title: stored?.title || past.title,
+      updatedAt: past.updatedAt ?? (stored ? new Date(stored.updatedAt).toISOString() : null),
+    };
+  });
+  const time = (past: PastSession) => Date.parse(past.updatedAt ?? "") || 0;
+  return described.toSorted((a, b) => time(b) - time(a));
+}
+
+/** Remembers which agent a session with a conversation belongs to, and what to call it. */
+function rememberSession(text: string | null) {
+  if (!sessionId) return;
+  sessionStore.update(sessionId, { agent: currentAgentId });
+  if (text && !sessionStore.get(sessionId)?.title) {
+    sessionStore.update(sessionId, { title: promptTitle(text) });
+  }
+}
+
 function reportResume() {
   const activeSession = (canResumeSession && hasConversation ? sessionId : null) ?? pendingResumeId;
   const state: ResumeState = {
@@ -200,7 +241,11 @@ function reportResume() {
   resume.update(state);
 }
 
-function emit(message: MainMessage) {
+function emit(original: MainMessage) {
+  const message: MainMessage =
+    original.type === "sessions"
+      ? { ...original, sessions: describeSessions(original.sessions) }
+      : original;
   debug?.record(message);
   status.observe(message);
   // Another agent starting replaces everything shown before, and its progress replaces itself.
@@ -220,10 +265,12 @@ function emit(message: MainMessage) {
     hasConversation = message.session.loadingHistory;
     history = history.filter((earlier) => earlier.type === "account");
     root.setTitle("Claudesaurus");
+    if (hasConversation) rememberSession(null);
     reportResume();
   }
   if (message.type === "userMessage") {
     hasConversation = true;
+    rememberSession(message.text);
     reportResume();
   }
   if (message.type === "update") {
@@ -237,9 +284,10 @@ function emit(message: MainMessage) {
     }
     if (message.update.sessionUpdate === "session_info_update" && message.update.title) {
       root.setTitle(`Claudesaurus · ${message.update.title}`);
+      if (sessionId) sessionStore.update(sessionId, { title: message.update.title });
     }
     if (message.update.sessionUpdate === "usage_update" && sessionId) {
-      usageStore.set(sessionId, { used: message.update.used, size: message.update.size });
+      sessionStore.update(sessionId, { used: message.update.used, size: message.update.size });
     }
   }
   // A list answers one request, and a page that reloads asks again. A party happens once.
@@ -250,8 +298,12 @@ function emit(message: MainMessage) {
 
 /** A reopened session gets the context usage it last reported, which Claude does not replay. */
 function restoreUsage() {
-  const usage = sessionId ? usageStore.get(sessionId) : null;
-  if (usage) emit({ type: "update", update: { sessionUpdate: "usage_update", ...usage } });
+  const stored = sessionId ? sessionStore.get(sessionId) : null;
+  if (stored?.used === undefined || stored.size === undefined) return;
+  emit({
+    type: "update",
+    update: { sessionUpdate: "usage_update", used: stored.used, size: stored.size },
+  });
 }
 
 const adapterPackage = require.resolve("@agentclientprotocol/claude-agent-acp/package.json");
@@ -270,8 +322,16 @@ function celebrateServer(): McpServer {
   };
 }
 
-/** `--agent` picks the agent for this run; otherwise the one last picked with `/agent`. */
-const firstAgentId = resolveAgentId(flags.agent ?? settings.agent);
+/**
+ * `--agent` picks the agent for this run. Without it, a session being reopened starts the agent
+ * it belongs to, since no other can open it; anything else starts the one last picked with
+ * `/agent`, in whichever pane that was.
+ */
+const firstAgentId = resolveAgentId(
+  flags.agent ??
+    (flags.resume === undefined ? undefined : sessionStore.get(flags.resume)?.agent) ??
+    settings.agent,
+);
 let currentAgentId = firstAgentId;
 
 /**
@@ -350,7 +410,7 @@ function quit(clearResume = true) {
   updater?.stop();
   debug?.stop();
   chatSocket.close();
-  usageStore.flush();
+  sessionStore.flush();
   status.clear();
   if (clearResume) resume.clear();
   agent.dispose();

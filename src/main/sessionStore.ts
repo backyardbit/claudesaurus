@@ -5,20 +5,29 @@ import { z } from "zod";
 
 export type ContextUsage = { used: number; size: number };
 
-/** How full each session's context was, by session id, and when that was noted. */
+/** What Claudesaurus remembers about a session it ran, by session id, and when it was last used. */
 const StoredSchema = z.record(
   z.string(),
-  z.object({ used: z.number(), size: z.number(), updatedAt: z.number() }),
+  z.object({
+    /** The registry id of the agent the session belongs to; no other agent can open it. */
+    agent: z.string().optional(),
+    /** The agent's title for it, or else the first thing asked in it. */
+    title: z.string().optional(),
+    used: z.number().optional(),
+    size: z.number().optional(),
+    updatedAt: z.number(),
+  }),
 );
 
 type Stored = z.infer<typeof StoredSchema>;
+export type StoredSession = Stored[string];
 
-const MAX_SESSIONS = 200;
+const MAX_SESSIONS = 500;
 const SAVE_DELAY_MS = 1000;
 
 function defaultFile() {
   const state = process.env.XDG_STATE_HOME ?? path.join(os.homedir(), ".local", "state");
-  return path.join(state, "claudesaurus", "usage.json");
+  return path.join(state, "claudesaurus", "sessions.json");
 }
 
 function read(file: string): Stored {
@@ -30,10 +39,11 @@ function read(file: string): Stored {
 }
 
 /**
- * Remembers how full each session's context was. Claude reports that only while a turn runs, so
- * without this a reopened session shows no figure until its next reply.
+ * Remembers each session's agent, title and how full its context was. A session can only be
+ * reopened by its own agent; some agents list sessions without a title or date; and Claude
+ * reports context use only while a turn runs.
  */
-export function createUsageStore(file = defaultFile()) {
+export function createSessionStore(file = defaultFile()) {
   const mine: Stored = {};
   let timer: NodeJS.Timeout | null = null;
 
@@ -50,13 +60,15 @@ export function createUsageStore(file = defaultFile()) {
     fs.renameSync(temporary, file);
   }
 
+  function get(sessionId: string): StoredSession | null {
+    return mine[sessionId] ?? read(file)[sessionId] ?? null;
+  }
+
   return {
-    get(sessionId: string): ContextUsage | null {
-      const found = mine[sessionId] ?? read(file)[sessionId];
-      return found ? { used: found.used, size: found.size } : null;
-    },
-    set(sessionId: string, usage: ContextUsage) {
-      mine[sessionId] = { ...usage, updatedAt: Date.now() };
+    get,
+    /** Records what is new about a session, keeping what was known of it before. */
+    update(sessionId: string, change: Partial<Omit<StoredSession, "updatedAt">>) {
+      mine[sessionId] = { ...get(sessionId), ...change, updatedAt: Date.now() };
       timer ??= setTimeout(save, SAVE_DELAY_MS);
     },
     /** Writes anything not saved yet, for when the app is about to exit. */
