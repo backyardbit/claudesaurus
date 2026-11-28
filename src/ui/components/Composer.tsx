@@ -18,7 +18,6 @@ import { ContextChip } from "./ContextChip";
 const MAX_COMMANDS = 10;
 const MAX_SESSIONS = 10;
 
-/** Commands the page answers itself, listed ahead of the agent's own. */
 const LOCAL_COMMANDS: AvailableCommand[] = [
   { name: "new", description: "Start a new chat" },
   { name: "clear", description: "Start a new chat, as /new does" },
@@ -33,33 +32,24 @@ const LOCAL_COMMANDS: AvailableCommand[] = [
 
 const LOCAL_NAMES = new Set(LOCAL_COMMANDS.map((command) => command.name));
 
-/** `/resume` and what follows it, which picks a past session. */
 const RESUME_PATTERN = /^\/resume\s+(.*)$/s;
 
-/** `/agent` and what follows it, which picks an agent. */
 const AGENT_PATTERN = /^\/agent\s+(.*)$/s;
 
 const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * A row of the menu above the composer: a command, or a session to open. Enter and a click
- * `pick` it; Tab only `fill`s a command into the input, as in Claude Code.
- */
 type MenuEntry = {
   key: string;
   name: string;
   detail: string;
   mono: boolean;
-  /** Whether the input is the start of this row, so Enter means it and not the text as typed. */
   typed: boolean;
   pick(): void;
   fill(): void;
 };
 
-/** How a typed character reaches the input, as opposed to a paste or a drop. */
 const TYPED_INPUT = new Set(["insertText", "insertLineBreak", "insertParagraph"]);
 
-/** How long after a handled key press its own character can still arrive. */
 const CONSUMED_KEY_WINDOW_MS = 100;
 
 export function matchCommands(
@@ -77,7 +67,6 @@ export function matchCommands(
         ? { ...command, description: `Apply update v${updateVersion} and resume this chat` }
         : command,
   );
-  // Put `/restart` first when an update is waiting, so typing `/` surfaces it immediately.
   const orderedLocal = updateVersion
     ? [
         ...local.filter((command) => command.name === "restart"),
@@ -93,7 +82,6 @@ export function matchCommands(
   return [...starts, ...contains].slice(0, MAX_COMMANDS);
 }
 
-/** The sessions whose title or id holds every word of the query, other than the open one. */
 export function matchSessions(sessions: PastSession[], query: string, currentId: string | null) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   return sessions
@@ -105,7 +93,6 @@ export function matchSessions(sessions: PastSession[], query: string, currentId:
     .slice(0, MAX_SESSIONS);
 }
 
-/** The agents whose name, id or description holds every word of the query. */
 export function matchAgents(agents: AgentChoice[], query: string) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   return agents
@@ -128,7 +115,6 @@ function readImage(file: File) {
   });
 }
 
-/** Makes the input as tall as its text, and scrollable past the height the styles allow. */
 function fitInput(element: HTMLTextAreaElement | null) {
   if (!element) return;
   element.style.height = "auto";
@@ -160,7 +146,6 @@ export function Composer() {
   const [selected, setSelected] = useState(0);
   const [menuDismissed, setMenuDismissed] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
-  // A task handed over by a PR viewer joins whatever is already typed rather than replacing it.
   useEffect(() => {
     if (draft === null) return;
     const taken = actions.takeDraft();
@@ -168,7 +153,6 @@ export function Composer() {
     setText((typed) => (typed.trim() === "" ? taken : `${typed.trimEnd()}\n\n${taken}`));
     input.current?.focus();
   }, [draft, actions]);
-  /** When a key press was last handled as a command, so the character it types can be dropped. */
   const consumedKeyAt = useRef(Number.NEGATIVE_INFINITY);
 
   const resumeQuery = canResume ? (RESUME_PATTERN.exec(text)?.[1] ?? null) : null;
@@ -218,7 +202,6 @@ export function Composer() {
           detail: command.description ?? "",
           mono: true,
           typed: `/${command.name}`.toLowerCase().startsWith(text.toLowerCase()),
-          // A command that takes an argument waits for it; any other runs at once.
           pick: () => (command.input ? complete(command) : submit(false, `/${command.name}`)),
           fill: () => complete(command),
         }));
@@ -247,7 +230,6 @@ export function Composer() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: the height depends on the text
   useLayoutEffect(() => fitInput(input.current), [text]);
 
-  // A narrower pane wraps the same text onto more lines.
   useEffect(() => {
     const element = input.current;
     if (!element) return;
@@ -261,7 +243,6 @@ export function Composer() {
     return () => observer.disconnect();
   }, []);
 
-  // Lists the sessions anew each time `/resume` is typed, so a chat from just now is there.
   useEffect(() => {
     if (resuming) actions.listSessions();
   }, [resuming, actions]);
@@ -271,8 +252,6 @@ export function Composer() {
   }, [choosingAgent, actions]);
 
   useEffect(() => {
-    // The terminal delivers a key press and the character it types as separate events, so
-    // cancelling the key press does not stop the character from being inserted.
     const element = input.current;
     if (!element) return;
     const dropConsumed = (event: InputEvent) => {
@@ -289,7 +268,6 @@ export function Composer() {
     const focusInput = (event: globalThis.KeyboardEvent) => {
       const target = event.target;
       if (target instanceof HTMLTextAreaElement) return;
-      // A slider keeps focus after a drag, but it has no use for typed characters.
       if (target instanceof HTMLInputElement && target.type !== "range") return;
       if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return;
       input.current?.focus();
@@ -298,10 +276,8 @@ export function Composer() {
     return () => window.removeEventListener("keydown", focusInput);
   }, []);
 
-  /** Sends the input, or queues it while the agent works unless `now` sends it into the turn. */
   function submit(now = false, value = text) {
     const command = value.trim();
-    // Switching agents, restarting and quitting work while an agent cannot start, too.
     if (command === "/agent") {
       setText("/agent ");
       setMenuDismissed(false);
@@ -324,7 +300,6 @@ export function Composer() {
       return;
     }
     if (resuming) {
-      // Enter with no chat picked opens one only when the text is a whole session id.
       const id = resumeQuery.trim();
       if (SESSION_ID_PATTERN.test(id)) resume(id);
       return;
@@ -384,8 +359,6 @@ export function Composer() {
         active.fill();
         return;
       }
-      // A row whose name only contains the input, rather than starting with it, waits for an
-      // arrow key; until then Enter sends the text as typed.
       if (event.key === "Enter" && !event.shiftKey && active && (active.typed || selected > 0)) {
         event.preventDefault();
         active.pick();
@@ -397,7 +370,6 @@ export function Composer() {
         return;
       }
     }
-    // Ctrl+Enter sends now, as in Claude Code: the input, or with an empty input the first queued.
     if (event.key === "Enter" && event.ctrlKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       if (canSend) submit(true);

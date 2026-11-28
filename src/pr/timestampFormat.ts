@@ -1,4 +1,3 @@
-/** "20m ago", "3d ago" or "just now", as T3 Code labels times. */
 type RelativeTimeParts = { value: string; suffix: string | null };
 
 function formatRelativeTime(isoDate: string): RelativeTimeParts | null {

@@ -49,13 +49,11 @@ import {
 } from "./pullRequestPresentation";
 import { sectionCollapseAnchorScrollTop } from "./pullRequestSummaryScroll.logic";
 
-/** A host colour only when it is one, so a malformed value falls back to the neutral dot. */
 function labelDotColor(color: string | null): string | null {
   const hex = color?.trim().replace(/^#/, "") ?? "";
   return /^[0-9a-fA-F]{6}$/.test(hex) ? `#${hex}` : null;
 }
 
-/** The avatar carries the attribution alone; who it is arrives on hover, like the reviewer row. */
 function CommentAuthor({ actor }: { actor: PullRequestActor | null }) {
   const login = actor?.login ?? "ghost";
   return (
@@ -70,13 +68,11 @@ function CommentAuthor({ actor }: { actor: PullRequestActor | null }) {
   );
 }
 
-/** "CHANGES_REQUESTED" reads as "Changes requested": one capital, the host's underscores gone. */
 function reviewStateLabel(state: string): string {
   const words = state.toLowerCase().replace(/_/g, " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** What every remark in the conversation needs to be rewritten where it sits. */
 interface CommentEditing {
   readonly cwd: string;
   readonly canEdit: (comment: PullRequestComment) => boolean;
@@ -86,10 +82,6 @@ interface CommentEditing {
   readonly onSave: (comment: PullRequestComment, body: string) => void;
 }
 
-/**
- * A remark's words, and the pencil that swaps them for the editor. The pencil is revealed by
- * hovering the remark, like the reaction bar's own, so the parent must carry `group`.
- */
 function CommentBody({
   comment,
   editing,
@@ -130,7 +122,6 @@ function CommentBody({
   );
 }
 
-/** Finished work — a resolved conversation or a dismissed approval — opens collapsed. */
 function CollapsedComment({
   comment,
   editing,
@@ -213,8 +204,6 @@ function Section({
   title: string;
   count?: number;
   defaultOpen?: boolean;
-  /** Controls riding on the heading row itself. A sibling of the trigger, not a child of it —
-      a button cannot hold a button — and only while open, since they act on what is shown. */
   actions?: ReactNode;
   children: ReactNode;
 }) {
@@ -232,8 +221,6 @@ function Section({
           sectionTop: section.getBoundingClientRect().top,
           headingTop: heading.getBoundingClientRect().top,
         });
-        // Synchronous with the press: React commits the collapsed height before the browser
-        // paints, so the reader sees the heading they pressed stay put rather than a jump first.
         if (target !== null) scroller.scrollTop = target;
       }
     }
@@ -245,15 +232,10 @@ function Section({
       onOpenChange={setOpenWithScrollAnchor}
       data-pull-request-summary-section
     >
-      {/* The heading rides the top of the scroll box the way a diff's file header does, so a
-          section can be collapsed from wherever its body has been read to rather than only from
-          where it started. Opaque, because the rows it covers scroll beneath it. */}
       <div
         ref={headingRef}
         className="sticky top-0 z-10 flex w-full items-center border-t border-border/60 bg-background pr-4"
       >
-        {/* Title first, chevron riding to its right, count last: the row reads as a heading
-            with an affordance rather than a tree node. */}
         <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1.5 px-4 py-3 text-left text-sm font-medium">
           <span>{title}</span>
           <ChevronRightIcon
@@ -310,8 +292,6 @@ function CommentComposer({
   return (
     <div className="mt-3 space-y-2">
       <Textarea
-        // Locked while posting: the body is cleared on success, which would otherwise throw
-        // away a new draft typed while the request was still in flight.
         disabled={posting}
         value={body}
         rows={3}
@@ -334,10 +314,6 @@ function CommentComposer({
   );
 }
 
-/**
- * What a first render of the conversation carries. A pull request with two hundred comments is
- * two hundred markdown documents, and the ones worth arriving for are the recent ones.
- */
 const COMMENT_PAGE = 30;
 
 export function PullRequestSummaryTab({
@@ -355,27 +331,19 @@ export function PullRequestSummaryTab({
   detail: PullRequestDetailView;
   activityPending: boolean;
   activityError: string | null;
-  /** The hand-off currently preparing, if any, so only the finding it belongs to says so. */
   pendingFinding?: string | null;
   fixFindingLabel?: string;
   fixCheckLabel?: string;
   onFixFinding?: (finding: PullRequestFinding) => void;
   onRefresh: () => void;
 }) {
-  // Keyed by the pull request, so opening another one starts at the end of its conversation
-  // rather than wherever the last one had been read back to.
   const [shown, setShown] = useState({ url: detail.url, count: COMMENT_PAGE });
   const shownComments = shown.url === detail.url ? shown.count : COMMENT_PAGE;
-  // Windowed by recency regardless of display order: expanding always reaches further back in
-  // time, whether the newest comment currently reads first or last.
   const recentComments = detail.comments.slice(Math.max(0, detail.comments.length - shownComments));
   const hiddenCommentCount = detail.comments.length - recentComments.length;
   const [commentOrder, setCommentOrder] = useState<"newest" | "oldest">("newest");
   const visibleComments = orderPullRequestComments(recentComments, commentOrder);
 
-  // A comment that already lives on a review thread is that thread: the thread carries the line
-  // and side the bare comment has lost, and a resolved one is finished work nobody should be
-  // invited to fix again — the same call the whole-review hand-off makes.
   const threadByCommentId = new Map(
     detail.reviewThreads.flatMap((thread) =>
       thread.comments.map((comment) => [comment.id, thread] as const),
@@ -388,14 +356,8 @@ export function PullRequestSummaryTab({
 
   const update = usePrCommand("update");
   const updateComment = usePrCommand("updateComment");
-  // Keyed by the pull request, like the comment window above it, so an editor left open never
-  // reappears over the next pull request's description.
   const [bodyScope, setBodyScope] = useState<string | null>(null);
   const [bodySaving, setBodySaving] = useState(false);
-  // The remark being rewritten, named with the pull request it belongs to: a comment id is the
-  // host's own, and two hosts — or two pull requests on Azure DevOps, which numbers a remark
-  // inside its thread — hand out the same one. Without the pull request beside it, opening a
-  // different one would leave its like-numbered remark sitting open in an editor.
   const [commentScope, setCommentScope] = useState<{
     readonly pullRequest: string;
     readonly commentId: string;
@@ -424,8 +386,6 @@ export function PullRequestSummaryTab({
     onEdit: (comment) =>
       setCommentScope(comment === null ? null : { pullRequest: detail.url, commentId: comment.id }),
     onSave: async (comment, body) => {
-      // A review's own summary is not a kind any host rewrites, which is why no pencil is ever
-      // offered on one; the check is here because the comment's own type still allows it.
       if (commentSaving || comment.kind === "review") return;
       setCommentSaving(true);
       const result = await updateComment({
@@ -475,11 +435,6 @@ export function PullRequestSummaryTab({
                   ))}
                 </span>
               )}
-              {/* Shown wherever the host can take a review request at all, and disabled with the
-                  reason where this account may not make one: a control that vanishes teaches
-                  nobody why, and "you need write access" is the answer to the question a reader
-                  actually has. Azure DevOps is the exception — it takes a reviewer but will not
-                  say who could be one, so there is nothing to open. */}
               {detail.capabilities.reviewers.request &&
               detail.capabilities.reviewers.listCandidates ? (
                 <PullRequestReviewerPicker
@@ -528,7 +483,6 @@ export function PullRequestSummaryTab({
         <div className="group">
           {bodyScope === detail.url ? (
             <PullRequestMarkdownEditor
-              // Empty is a real answer here: saving nothing is how a description is cleared.
               allowEmpty
               value={detail.body}
               cwd={detail.workspaceRoot}
@@ -578,8 +532,6 @@ export function PullRequestSummaryTab({
               const failing = check.status === "failure" || check.status === "cancelled";
               return (
                 <div
-                  // Position too: the host decides how many runs share a name, and a repeated
-                  // key would be a rendering fault on top of whatever the list already says.
                   key={`${index}:${check.name}:${check.url ?? ""}`}
                   className="group flex items-center gap-1 rounded-md pr-1 hover:bg-accent/60"
                 >
@@ -598,8 +550,6 @@ export function PullRequestSummaryTab({
                       {pullRequestCheckStatusLabel(check.status)}
                     </span>
                   </button>
-                  {/* Only where there is something to fix. A passing check has no failure to
-                      reproduce, and the button would be an invitation to waste a thread. */}
                   {onFixFinding && failing ? (
                     <Button
                       size="xs"
@@ -660,9 +610,6 @@ export function PullRequestSummaryTab({
             ) : (
               <div className="space-y-3">
                 {hiddenCommentCount > 0 ? (
-                  // Hundreds of comments are hundreds of markdown renders, and the ones worth
-                  // opening a pull request for are the recent ones. The rest are one press away and
-                  // stay rendered once asked for.
                   <Button
                     size="sm"
                     variant="outline"
@@ -698,7 +645,6 @@ export function PullRequestSummaryTab({
                       />
                     );
                   }
-                  // An approval is a verdict, not a finding: there is nothing in it to fix.
                   const finding: PullRequestFinding | null =
                     (comment.kind !== "review" && comment.kind !== "review-comment") ||
                     reviewState === "approved"
@@ -709,8 +655,6 @@ export function PullRequestSummaryTab({
                   return (
                     <article
                       key={comment.id}
-                      // Offscreen comments skip style, layout and paint. Bot comments carry pages of
-                      // highlighted code, and the conversation is below the description either way.
                       className="group rounded-lg border border-border/60 p-3 [contain-intrinsic-block-size:120px] [content-visibility:auto]"
                     >
                       <div className="flex items-start gap-2">
@@ -721,8 +665,6 @@ export function PullRequestSummaryTab({
                             <span>{reviewStateLabel(comment.reviewState)}</span>
                           ) : null}
                         </span>
-                        {/* Review remarks only. A plain conversation comment is talk, not a finding,
-                      and offering to fix one would promise more than it says. */}
                         {onFixFinding && finding ? (
                           <Button
                             size="xs"
@@ -762,7 +704,6 @@ export function PullRequestSummaryTab({
             )}
           </>
         )}
-        {/* Posting is a core capability and remains usable even if the activity read failed. */}
         {detail.capabilities.comment && detail.viewerPermissions.comment ? (
           <CommentComposer
             key={`${detail.repository}#${detail.number}`}

@@ -1,11 +1,6 @@
 import type { SessionConfigOption, SessionUpdate } from "@agentclientprotocol/sdk";
 import type { Bridge, MainMessage, UiMessage } from "../shared/protocol";
 
-/**
- * A scripted conversation for working on the page in a plain browser (`pnpm dev:ui`).
- * Add `?static` to the address to skip the delays.
- */
-
 let configOptions: SessionConfigOption[] = [
   {
     id: "model",
@@ -361,7 +356,6 @@ export function createMockBridge(): Bridge {
             },
           ],
           [600, { type: "turnEnded", stopReason: "end_turn" }],
-          // Mentioning a merge plays the party, as the agent's `celebrate` tool would.
           ...(/merge/i.test(message.text)
             ? [[0, { type: "celebrate", pr: 28 }] satisfies [number, MainMessage]]
             : []),

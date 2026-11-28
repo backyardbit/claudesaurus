@@ -59,7 +59,6 @@ test("an agent that advertises nothing gets the baseline", () => {
     systemPrompt: false,
     embeddedContext: false,
   });
-  // Loading alone is not enough for /resume, which first lists the sessions.
   const loadOnly = agentFeatures({ protocolVersion: 1, agentCapabilities: { loadSession: true } });
   expect(loadOnly.resume).toBe(false);
   const steerOff = agentFeatures({ protocolVersion: 1, _meta: { steering: { supported: false } } });

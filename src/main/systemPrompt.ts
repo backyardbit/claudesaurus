@@ -1,7 +1,3 @@
-/**
- * Added to Claude's system prompt in every session. Claude Code assumes a plain terminal, so
- * without this it never uses what the chat page can draw.
- */
 export const SYSTEM_PROMPT_APPEND = `# Claudesaurus
 
 You are running in Claudesaurus, a graphical chat client, not a plain terminal. Your replies are drawn by a real browser engine, so the following render directly in the conversation:

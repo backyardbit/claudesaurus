@@ -9,10 +9,8 @@ import { Working } from "./components/Working";
 import { shortPath } from "./format";
 import { useActions, useAppState } from "./store";
 
-/** Room kept under the newest content when the view moves to show it, in pixels. */
 const FOLLOW_MARGIN = 24;
 
-/** Room kept above a message that was just sent, in pixels. */
 const SENT_MARGIN = 16;
 
 function Welcome() {
@@ -57,12 +55,6 @@ export function App() {
   const sentMessage = useRef<string | null>(null);
   const [away, setAway] = useState(false);
 
-  /**
-   * Keeps the newest content at the bottom of the view once it runs past it. PixelGUI moves the
-   * picture already in the terminal and sends only the strip that scrolled in, so following line
-   * by line costs about a quarter more drawing during a turn than moving a page at a time did,
-   * and leaves no empty space under the newest line.
-   */
   const follow = useCallback(() => {
     const view = scroller.current;
     const marker = end.current;
@@ -88,8 +80,6 @@ export function App() {
     follow();
   }, [items, permissions, running]);
 
-  // The column grows with new content and reflows when the pane's width changes; the view itself
-  // gets shorter when the pane does, which would leave the newest lines under the composer.
   useEffect(() => {
     if (!column.current || !scroller.current) return;
     const observer = new ResizeObserver(follow);

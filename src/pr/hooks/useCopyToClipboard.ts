@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { writeTextToClipboard } from "../lib/links";
 
-/** Copies text and says so for `timeout` ms, as T3 Code's copy buttons do. */
 export function useCopyToClipboard({ timeout = 2000 }: { timeout?: number; target?: string } = {}) {
   const [isCopied, setIsCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);

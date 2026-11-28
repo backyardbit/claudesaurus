@@ -2,12 +2,6 @@ import readline from "node:readline";
 import { z } from "zod";
 import { sendToChat } from "./chatSocket";
 
-/**
- * The MCP server Claudesaurus gives the agent, over stdio. Its one tool, `celebrate`, tells the
- * chat that started it, through the chat's socket, to play the party for a merged pull request.
- * A chat cannot tell from outside when the work in a thread is done; the agent can.
- */
-
 const TOOL = {
   name: "celebrate",
   title: "Celebrate",
@@ -25,7 +19,6 @@ const TOOL = {
 
 const Id = z.union([z.string(), z.number()]);
 
-/** The requests the server answers, parsed as they arrive. */
 const RequestSchema = z.discriminatedUnion("method", [
   z.object({
     id: Id,
@@ -44,7 +37,6 @@ const RequestSchema = z.discriminatedUnion("method", [
   }),
 ]);
 
-/** Any other request, which gets an error; a message without an id is a notification. */
 const OtherRequestSchema = z.object({ id: Id, method: z.string() });
 
 type Request = z.infer<typeof RequestSchema>;
@@ -53,7 +45,6 @@ type Reply =
   | { id: string | number; result: Awaited<ReturnType<typeof answer>> }
   | { id: string | number; error: { code: number; message: string } };
 
-/** The protocol version answered when the client does not name one. */
 const DEFAULT_PROTOCOL = "2025-06-18";
 
 function write(reply: Reply) {

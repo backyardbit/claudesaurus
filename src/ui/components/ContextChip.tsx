@@ -3,7 +3,6 @@ import { formatTokens } from "../format";
 import { useAppState } from "../store";
 import { Popover } from "./Popover";
 
-/** From this share of the context on, the chip turns yellow, and from the second, red. */
 const WARN_AT = 0.75;
 const FULL_AT = 0.9;
 
@@ -15,7 +14,6 @@ function contextColor(fraction: number) {
   return "var(--muted)";
 }
 
-/** A ring that fills clockwise from the top as the context fills. */
 function Ring({ fraction }: { fraction: number | null }) {
   return (
     <svg className="context-ring" viewBox="0 0 16 16" width={15} height={15} aria-hidden>
@@ -34,10 +32,6 @@ function Ring({ fraction }: { fraction: number | null }) {
   );
 }
 
-/**
- * How full the agent's context is, as a ring in the composer that opens the figures. The figures
- * are unknown until the agent reports them in a turn.
- */
 export function ContextChip() {
   const usage = useAppState((state) => state.usage);
   const agentName = useAppState((state) => state.agent?.name ?? "the agent");

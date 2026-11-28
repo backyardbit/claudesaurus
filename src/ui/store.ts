@@ -40,19 +40,16 @@ export type ToolState = {
   status: ToolCallStatus;
   content: ToolCallContent[];
   locations: ToolCallLocation[];
-  /** The input as Claude sent it, shown as JSON for tools the page knows nothing about. */
   rawInput: unknown;
   input: ToolInput;
   output: string | null;
   response: ToolResponse | null;
   startedAt: number;
   endedAt: number | null;
-  /** False for a call replayed from a past session, whose real times are not known. */
   timed: boolean;
   children: Item[];
 };
 
-/** The time an update arrived, and whether that says anything about when its work happened. */
 type Moment = { now: number; timed: boolean };
 
 export type Item =
@@ -81,12 +78,9 @@ export type Draft = { text: string; images: PromptImage[] };
 export type Usage = { used: number; size: number };
 
 export type State = {
-  /** `auth` waits for the user to sign in to the agent before a session can open. */
   phase: "connecting" | "auth" | "ready" | "failed";
   failure: string | null;
-  /** The agent that is starting or running. */
   agent: AgentIdentity | null;
-  /** How far along starting the agent is, such as a download's progress. */
   connectingDetail: string | null;
   auth: AuthRequest | null;
   session: SessionInfo | null;
@@ -100,26 +94,17 @@ export type State = {
   permissions: PermissionRequest[];
   usage: Usage | null;
   commands: AvailableCommand[];
-  /** Sessions `/resume` can open, or null while they are being listed. */
   pastSessions: PastSession[] | null;
-  /** Agents `/agent` can switch to, or null while they are being listed. */
   agents: AgentChoice[] | null;
-  /** True while a past session's conversation is being replayed into the page. */
   replaying: boolean;
-  /** `/zen`: the conversation shows only what was said, without tool calls, thoughts or the plan. */
   zen: boolean;
-  /** Version of a downloaded update waiting for `/restart`, or null when up to date. */
   updateVersion: string | null;
-  /** True after the user closes the update toast; `/restart` still applies the update. */
   updateDismissed: boolean;
-  /** Text waiting to be put in the composer, which takes it once. */
   draft: string | null;
   toast: string | null;
-  /** The party for a merged pull request that is playing, if one is. */
   celebration: Celebration | null;
 };
 
-/** One party; `id` tells a party that follows another apart from it. */
 export type Celebration = { id: number; pr: number | null };
 
 export const initialState: State = {
@@ -168,7 +153,6 @@ function closeThoughts(items: Item[], now: number) {
   return [...items.slice(0, -1), { ...last, endedAt: now }];
 }
 
-/** Adds streamed text to the message it continues, or starts the next message. */
 function appendText(
   items: Item[],
   kind: "assistant" | "thought",
@@ -191,7 +175,6 @@ function appendText(
   return [...closed, { kind, id: localId("thought"), text, startedAt: now, endedAt: null, timed }];
 }
 
-/** Adds a replayed piece of a user message to the message it belongs to, or starts the next one. */
 function appendUserChunk(
   items: Item[],
   block: ContentBlock,
@@ -261,7 +244,6 @@ function newTool(update: ToolCallUpdate, { now, timed }: Moment): ToolState {
   return mergeTool(blank, update, now);
 }
 
-/** Replaces the tool with the given id, wherever it is nested. Returns the same array if absent. */
 function mapTool(
   items: Item[],
   toolCallId: string,
@@ -378,7 +360,6 @@ function applyUpdate(state: State, update: SessionUpdate, now: number): State {
 export function reduce(state: State, message: MainMessage, now: number): State {
   switch (message.type) {
     case "connecting":
-      // An agent starting begins a new conversation; one already starting only reports progress.
       return {
         ...(state.phase === "connecting" && state.agent?.id === message.agent.id
           ? state
@@ -419,7 +400,6 @@ export function reduce(state: State, message: MainMessage, now: number): State {
       return { ...state, updateVersion: message.version, updateDismissed: false };
     case "draft":
       return { ...state, draft: message.text };
-    // A toast is shown by the store, with its own timer, rather than kept as state.
     case "toast":
       return state;
     case "celebrate":
@@ -434,7 +414,6 @@ export function reduce(state: State, message: MainMessage, now: number): State {
       return {
         ...state,
         running: true,
-        // A message sent into a running turn continues it, so the turn keeps its start.
         turnStartedAt: state.running ? state.turnStartedAt : now,
         items: [
           ...closeThoughts(state.items, now),
@@ -463,7 +442,6 @@ export function reduce(state: State, message: MainMessage, now: number): State {
       return {
         ...state,
         permissions: state.permissions.filter((request) => request !== closed),
-        // The wait for an answer is not part of how long the tool ran.
         items: mapTool(state.items, closed.toolCall.toolCallId, (tool) =>
           tool.endedAt === null ? { ...tool, startedAt: now } : tool,
         ),
@@ -486,10 +464,6 @@ export function reduce(state: State, message: MainMessage, now: number): State {
   }
 }
 
-/**
- * How often the page redraws while messages arrive. Every redraw is drawn again in the terminal,
- * so streamed text is shown in steps of this length instead of token by token.
- */
 const NOTIFY_INTERVAL_MS = 80;
 
 export function createStore(bridge: Bridge) {
@@ -533,10 +507,6 @@ export function createStore(bridge: Bridge) {
     toastTimer = window.setTimeout(() => set({ ...state, toast: null }), 1800);
   }
 
-  /**
-   * Sends a message into the running turn, so the agent reads it before it carries on. An agent
-   * that cannot take one mid-turn gets it first thing after the turn instead.
-   */
   function sendNow(draft: Draft) {
     if (!state.running) sendDraft(draft);
     else if (state.session?.features.steer) {
@@ -548,7 +518,6 @@ export function createStore(bridge: Bridge) {
   }
 
   const actions = {
-    /** Sends a message, or queues it while the agent works unless `now` sends it into the turn. */
     send(draft: Draft, { now = false } = {}) {
       if (state.phase !== "ready") return;
       if (state.running && !now) set({ ...state, queue: [...state.queue, draft] });
@@ -594,7 +563,6 @@ export function createStore(bridge: Bridge) {
       if (state.running) bridge.send({ type: "cancel" });
       bridge.send({ type: "newSession" });
     },
-    /** Lists the sessions `/resume` can open, afresh each time it is typed. */
     listSessions() {
       set({ ...state, pastSessions: null });
       bridge.send({ type: "listSessions" });
@@ -603,7 +571,6 @@ export function createStore(bridge: Bridge) {
       if (state.running) bridge.send({ type: "cancel" });
       bridge.send({ type: "resume", sessionId });
     },
-    /** Lists the agents `/agent` can switch to, afresh each time it is typed. */
     listAgents() {
       set({ ...state, agents: null });
       bridge.send({ type: "listAgents" });
@@ -622,11 +589,9 @@ export function createStore(bridge: Bridge) {
       bridge.send({ type: "copy", text });
       showToast(label);
     },
-    /** Main answers with a toast saying what it did: opened a pull request, or copied the link. */
     openLink(url: string) {
       bridge.send({ type: "openLink", url });
     },
-    /** Hands the waiting draft to the composer, once. */
     takeDraft() {
       const { draft } = state;
       if (draft !== null) set({ ...state, draft: null });
@@ -639,7 +604,6 @@ export function createStore(bridge: Bridge) {
     dismissUpdate() {
       set({ ...state, updateDismissed: true });
     },
-    /** The party has played to its end. */
     endCelebration() {
       set({ ...state, celebration: null });
     },

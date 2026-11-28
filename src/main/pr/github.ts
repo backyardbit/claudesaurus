@@ -1,8 +1,3 @@
-/**
- * The pull request viewer's GitHub access, through the `gh` CLI the user is signed in to. Ported
- * from T3 Code's GitHubPullRequestCli.ts and GitHubPullRequestProvider.ts (MIT), without the
- * multi-provider and multi-host layers. Anything the user wrote travels to gh over stdin.
- */
 import { z } from "zod";
 import type {
   PullRequestAction,
@@ -57,39 +52,31 @@ import { checkNumber, splitRepository } from "./target";
 
 export { resolvePullRequestTarget } from "./target";
 
-/** `PullRequestApi` as the main process serves it: every method answers with a promise. */
 export type GitHubPullRequests = {
   [M in PullRequestMethod]: (
     input: Parameters<PullRequestApi[M]>[0],
   ) => Promise<ReturnType<PullRequestApi[M]>>;
 };
 
-/** A large pull request's patch runs to megabytes; past this it is read from the files API. */
 const DIFF_MAX_BYTES = 8 * 1024 * 1024;
 const DIFF_TIMEOUT_MS = 60_000;
-/** Expanding context is for source files, not blobs large enough to stall the page. */
 const FILE_MAX_BYTES = 1024 * 1024;
-/** What the files API serves at most in one response, which is what one slice of a diff is. */
 const FILES_PAGE_SIZE = 100;
-/** Pages of a hundred review threads read before the conversation is reported truncated. */
 const THREAD_PAGES = 10;
 
 const COMMIT_SHA = /^[0-9a-f]{7,64}$/i;
 
-/** A commit sha from the page goes into a request path, so it must be nothing but hex. */
 function checkCommit(commit: string) {
   if (!COMMIT_SHA.test(commit)) throw new Error(`"${commit}" is not a commit sha.`);
   return commit;
 }
 
-/** The page a diff cursor names. Only this module hands cursors out, so anything else is refused. */
 function cursorPage(cursor: string) {
   if (!/^[1-9][0-9]{0,6}$/.test(cursor))
     throw new Error("That diff cursor is not one GitHub gave.");
   return Number(cursor);
 }
 
-/** A repository path for the contents API, refusing segments that would climb out of it. */
 function contentsPath(path: string) {
   const segments = path.split("/");
   if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
@@ -106,7 +93,6 @@ function actionArgs(
   switch (action) {
     case "merge":
       return ["merge", `--${mergeMethod ?? "merge"}`];
-    // `--auto` arms the merge rather than running it; GitHub stores the method with it.
     case "enable-auto-merge":
       return ["merge", "--auto", `--${mergeMethod ?? "merge"}`];
     case "disable-auto-merge":
@@ -127,9 +113,7 @@ function actionArgs(
 const RevisionsSchema = z.object({ base: z.string().nullable(), head: z.string() });
 const MergeBaseSchema = z.object({ base: z.string() });
 
-/** The pull request viewer's reads and writes for the repository checkout at `cwd`. */
 export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
-  /** Checks a reference from the page and spells it the way the GraphQL queries take it. */
   function target(input: { repository: string; number: number }) {
     const { owner, name } = splitRepository(input.repository);
     return { owner, name, number: checkNumber(input.number) };
@@ -147,10 +131,6 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
     return response.data.repository.pullRequest.id;
   }
 
-  /**
-   * A node id from the page can name a remark on any pull request, and a mutation writes wherever
-   * the id belongs. So it is confirmed to hang off this pull request before anything is sent.
-   */
   async function requireSubject(ref: Target, subjectId: string) {
     const scope = await graphql(
       cwd,
@@ -163,18 +143,13 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
       throw new Error("That comment does not belong to this pull request.");
   }
 
-  /**
-   * One slice of the patch from the files API, a whole number of files, for a pull request too
-   * large for `gh pr diff` (GitHub refuses past 300 files) or for one commit of it.
-   */
   async function filesPage(ref: Target, page: number, commit: string | undefined) {
     const paging = `per_page=${FILES_PAGE_SIZE}&page=${page}`;
     const base = `repos/${ref.owner}/${ref.name}`;
     const args =
       commit === undefined
         ? ["api", `${base}/pulls/${ref.number}/files?${paging}`]
-        : // An empty commit has no `files` at all, which is a commit with nothing in it.
-          ["api", `${base}/commits/${commit}?${paging}`, "--jq", ".files // []"];
+        : ["api", `${base}/commits/${commit}?${paging}`, "--jq", ".files // []"];
     const output = await runGh(args, { cwd, maxBytes: DIFF_MAX_BYTES, timeoutMs: DIFF_TIMEOUT_MS });
     if (output.truncated)
       throw new Error(`Page ${page} of the changed files is too large to read.`);
@@ -189,10 +164,6 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
     return result;
   }
 
-  /**
-   * The two revisions a diff compares. A pull request's diff is taken from the merge base, not
-   * from the base branch's tip, so the old side is read there or its lines would not line up.
-   */
   async function revisions(ref: Target, commit: string | undefined) {
     const base = `repos/${ref.owner}/${ref.name}`;
     if (commit !== undefined) {
@@ -274,8 +245,6 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
         "the pull request",
       );
       const headRef = comparisonHeadRef(response);
-      // Only an open pull request can be behind its base. A failed comparison leaves it unknown:
-      // the banner it feeds is an offer, never a reason to fail the page.
       const behindBy =
         headRef === null
           ? null
@@ -298,8 +267,6 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
 
     async activity(input) {
       const ref = target(input);
-      // `gh pr view` follows the comment and review cursors itself; line comments live on review
-      // threads, which only the GraphQL read reaches.
       const [conversation, threads] = await Promise.all([
         ghJson(
           cwd,
@@ -323,7 +290,6 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
     async diff(input) {
       const ref = target(input);
       const commit = input.commit === undefined ? undefined : checkCommit(input.commit);
-      // A cursor only ever comes from the files walk, and `gh pr diff` cannot name one commit.
       if (input.cursor !== undefined) return filesPage(ref, cursorPage(input.cursor), commit);
       if (commit !== undefined) return filesPage(ref, 1, commit);
       const args = [
@@ -339,12 +305,8 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
       try {
         output = await runGh(args, { cwd, maxBytes: DIFF_MAX_BYTES, timeoutMs: DIFF_TIMEOUT_MS });
       } catch (error) {
-        // GitHub answers 406 rather than a diff past 300 files or 20,000 lines, and still serves
-        // those files' hunks one page at a time. Should that fail too, the first refusal is the
-        // one that explains the page.
         return filesPage(ref, 1, undefined).catch(() => Promise.reject(error));
       }
-      // A patch cut mid-file is no patch at all, so an oversized one is read in slices instead.
       if (output.truncated) return filesPage(ref, 1, undefined);
       return { patch: output.stdout.toString("utf8"), truncated: false, nextCursor: null };
     },
@@ -390,7 +352,6 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
 
     async update(input) {
       const ref = target(input);
-      // A field not sent is left as it was, so only what the user changed is in the request.
       const variables: GraphQlVariables = { pullRequestId: await pullRequestId(ref) };
       if (input.title !== undefined) variables.title = input.title;
       if (input.body !== undefined) variables.body = input.body;
@@ -436,7 +397,6 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
       const ref = target(input);
       let subjectId: string;
       if (input.subjectId === undefined) {
-        // The pull request's own reactions sit on its description, which nothing on the page names.
         subjectId = await pullRequestId(ref);
       } else {
         await requireSubject(ref, input.subjectId);
@@ -462,7 +422,6 @@ export function createGitHub({ cwd }: { cwd: string }): GitHubPullRequests {
 
     async requestReviewers(input) {
       const ref = target(input);
-      // POST adds to whoever is already asked; DELETE takes back exactly the ones named.
       await runGh(
         [
           "api",

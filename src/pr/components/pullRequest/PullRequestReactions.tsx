@@ -21,22 +21,12 @@ const PILL_CLASS =
 
 const EMPTY_PENDING: ReadonlyMap<PullRequestReactionContent, boolean> = new Map();
 
-/** What the host last said, so a press in flight is forgotten the moment the real counts land. */
 function reactionsSignature(reactions: ReadonlyArray<PullRequestReaction>): string {
   return reactions
     .map((reaction) => `${reaction.content}:${reaction.count}:${reaction.viewerHasReacted ? 1 : 0}`)
     .join(" ");
 }
 
-/**
- * The reaction pills under a remark, and the picker that adds one. The same bar serves the
- * description, a conversation comment and a review thread's comments: what differs between them
- * is only which subject the host is told about.
- *
- * The add button is revealed by hovering the remark it belongs to, the way GitHub's is, so the
- * parent must carry `group`. It stays put once there is something to press it beside, while the
- * picker is open, and whenever it is focused — a control only a mouse can find is no control.
- */
 export function PullRequestReactionBar({
   reactions,
   canReact,
@@ -47,7 +37,6 @@ export function PullRequestReactionBar({
 }: {
   readonly reactions: ReadonlyArray<PullRequestReaction>;
   readonly canReact: boolean;
-  /** Absent reacts to the change request itself, which is where its description's reactions live. */
   readonly subjectId?: string | undefined;
   readonly reference: PullRequestRef;
   readonly onRefresh: () => void;

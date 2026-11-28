@@ -15,20 +15,13 @@ import {
   type RegistryAgent,
 } from "./registry";
 
-/** Claude's adapter, which ships with the app, so Claude starts with no network. */
 export type BundledClaude = { nodePath: string; adapterEntry: string };
 
-/** A program beside the Node that runs the app, such as its npx, or else the one on the PATH. */
 function besideNode(nodePath: string, program: string) {
   const beside = path.join(path.dirname(nodePath), program);
   return path.isAbsolute(nodePath) && fs.existsSync(beside) ? beside : program;
 }
 
-/**
- * Finds the agent in the ACP registry and gets it ready to run: a binary release is downloaded
- * once into the cache, and an npm or PyPI package is left to npx or uvx. Claude runs from the
- * adapter bundled with the app.
- */
 export async function prepareLaunch(
   agentId: string,
   claude: BundledClaude,
@@ -71,14 +64,11 @@ export async function prepareLaunch(
   return { name, launch };
 }
 
-/** The agents `/agent` offers, with Claude first whether or not the registry is reachable. */
 export async function agentChoices(claudeVersion: string): Promise<AgentChoice[]> {
   let entries: RegistryAgent[] = [];
   try {
     entries = pickerOrder(await loadRegistry(), currentTarget());
-  } catch {
-    // Offline with nothing cached: Claude can still be picked.
-  }
+  } catch {}
   const claude: AgentChoice = {
     id: CLAUDE_ID,
     name: agentName(CLAUDE_ID, null),
@@ -98,10 +88,6 @@ export async function agentChoices(claudeVersion: string): Promise<AgentChoice[]
   ];
 }
 
-/**
- * Runs a login command in a Rex pane below this one, and resolves to whether it succeeded once
- * the pane's program exits. Null outside Rex, where the user runs the command themselves.
- */
 export function openRexPane(command: LaunchCommand, cwd: string, label: string) {
   const block = process.env.REX_BLOCK;
   if (!block) return null;
@@ -112,7 +98,6 @@ export function openRexPane(command: LaunchCommand, cwd: string, label: string) 
   });
 }
 
-/** `rex split` arguments that run a command in a pane below a block and wait for it to exit. */
 export function rexPaneArgs(block: string, command: LaunchCommand, cwd: string, label: string) {
   const variables = [...command.env].map(([key, value]) => `${key}=${value}`);
   return [

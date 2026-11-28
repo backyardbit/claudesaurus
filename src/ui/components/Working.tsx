@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 import { formatDuration } from "../format";
 import { Dinosaur } from "./Dinosaur";
 
-/**
- * Words shown while Claude works, as Claude Code does with its own. One is picked at random for
- * each turn, and a long turn moves on to the next every WORD_SECONDS.
- */
 const WORDS = [
   "Stomping",
   "Roaring",
@@ -37,13 +33,8 @@ const WORDS = [
 
 const WORD_SECONDS = 12;
 
-/**
- * How often the dinosaur moves. Each frame is a change the terminal has to draw again, so this
- * is the animation's cost.
- */
 const FRAME_MS = 1000 / 12;
 
-/** With reduced motion the grown dinosaur stands still and the clock ticks once a second. */
 const STILL_AT = 9;
 const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

@@ -1,8 +1,3 @@
-/**
- * What GitHub's answers are expected to look like. Every field is optional, and enum-like fields
- * are plain strings normalised in mapping.ts: a gh release or an API change that adds a state
- * must not fail the whole page.
- */
 import { z } from "zod";
 
 const text = z.string().nullish();
@@ -222,7 +217,6 @@ export const ActivityResponseSchema = z.object({
 });
 export type ActivityResponse = z.infer<typeof ActivityResponseSchema>;
 
-/** `gh pr view --json comments,reviews`, which follows GitHub's cursors itself. */
 export const ConversationSchema = z.object({
   comments: z
     .array(
@@ -276,13 +270,11 @@ export const SubjectScopeSchema = z.object({
 
 export type SubjectScope = z.infer<typeof SubjectScopeSchema>;
 
-/** One entry of the REST files list, for a pull request or a single commit. */
 export const FilesSchema = z.array(
   z.object({
     filename: z.string(),
     status: text,
     previous_filename: text,
-    /** Absent for a binary file, and for one GitHub considers too large to diff. */
     patch: text,
     additions: count,
     deletions: count,

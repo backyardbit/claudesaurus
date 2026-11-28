@@ -33,7 +33,6 @@ const toggleVariants = cva(
   },
 );
 
-// Forwards its ref for React 18, as Button does: a tooltip trigger renders a Toggle.
 const Toggle = React.forwardRef<
   HTMLButtonElement,
   TogglePrimitive.Props & VariantProps<typeof toggleVariants>

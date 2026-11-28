@@ -21,10 +21,6 @@ import { isVideo } from "../video";
 import { CodeBlock } from "./CodeBlock";
 import { Video } from "./Video";
 
-/**
- * The default schema, plus the classes remark-math uses to hand formulas to KaTeX, and images
- * from `file:` addresses, since a reply shows a local video with one.
- */
 const sanitizeSchema = {
   ...defaultSchema,
   attributes: {
@@ -34,7 +30,6 @@ const sanitizeSchema = {
   protocols: { ...defaultSchema.protocols, src: [...(defaultSchema.protocols?.src ?? []), "file"] },
 };
 
-/** Keeps a `file:` image address, which react-markdown's own check would drop. */
 function urlTransform(url: string, key: string) {
   return key === "src" && /^file:\/\//i.test(url) ? url : defaultUrlTransform(url);
 }
@@ -90,7 +85,6 @@ function Anchor({ href, children }: ComponentProps<"a">) {
   );
 }
 
-/** An image, or a video when the address names one: `![demo](/tmp/demo.webm)`. */
 function Image({ src, alt, title }: ComponentProps<"img">) {
   if (src !== undefined && isVideo(src)) return <Video src={src} title={title ?? alt ?? ""} />;
   return <img src={src} alt={alt} title={title} />;

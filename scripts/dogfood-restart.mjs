@@ -1,12 +1,3 @@
-// Restarts a Claudesaurus pane on a new build, from inside the session running in that pane.
-//
-//   node scripts/dogfood-restart.mjs BLOCK PIXEL_PID SESSION_ID
-//
-// It waits for the turn in the pane to end, quits the app, and runs this checkout's
-// `bin/claudesaurus.mjs --resume SESSION_ID --agent AGENT` in the shell under it, with the agent
-// the pane was running. Quitting the app ends the
-// session that started the script, so the script first moves itself into a new process session
-// and returns at once; it logs to ~/.local/state/claudesaurus/restart.log.
 import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -38,7 +29,6 @@ function alive() {
   }
 }
 
-/** The port PixelGUI's Chromium listens on for debugging. macOS has no `ss`, so it uses `lsof`. */
 function debugPort() {
   const sockets =
     process.platform === "linux"
@@ -51,10 +41,6 @@ function debugPort() {
   return sockets.map((line) => line.match(/127\.0\.0\.1:(\d+)/)?.[1]).find(Boolean);
 }
 
-/**
- * The agents' names in the Program Status Protocol, as `statusApp` in src/main/status.ts reports
- * them, back to their registry ids. Any other agent reports its registry id itself.
- */
 const AGENT_IDS = new Map([
   ["claude-code", "claude-acp"],
   ["codex", "codex-acp"],
@@ -65,10 +51,6 @@ const AGENT_IDS = new Map([
   ["opencode", "opencode"],
 ]);
 
-/**
- * The agent the pane is running, read from its program status before the app quits. A session
- * belongs to its agent, and without `--agent` the app starts the agent last picked in any pane.
- */
 const StatusSchema = z.object({ records: z.array(z.object({ app: z.string() })).min(1) });
 
 function runningAgent() {
@@ -83,10 +65,6 @@ function runningAgent() {
   }
 }
 
-/**
- * Quotes a word for the shell in the pane, which may be sh, zsh or fish. They escape a single
- * quote differently, so a word with one is refused.
- */
 function quote(word) {
   if (word.includes("'")) throw new Error(`cannot quote ${word} for every shell`);
   return `'${word}'`;
@@ -107,7 +85,6 @@ if (!process.env[DETACHED]) {
   process.exit(0);
 }
 
-// Detached, the script has no terminal to report to.
 process.on("uncaughtException", (error) => {
   log(`failed: ${error.message}`);
   process.exit(1);
@@ -134,7 +111,6 @@ async function evaluate(port, expression) {
   });
 }
 
-/** True while a turn runs, a prompt waits, or the user has typed something they have not sent. */
 const BUSY = `Boolean(
   document.querySelector(".working, .send.stop, .permission, .queued") ||
     document.querySelector("textarea")?.value

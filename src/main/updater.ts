@@ -11,32 +11,23 @@ import { cacheHome } from "./registry";
 
 const run = promisify(execFile);
 
-/** GitHub Releases endpoint for the newest stable release of Claudesaurus. */
 export const LATEST_RELEASE_URL =
   "https://api.github.com/repos/backyardbit/claudesaurus/releases/latest";
 
-/** The pnpm that wrote the lockfile, matching `bin/runtime.mjs`. */
 const PNPM = "pnpm@9.15.4";
 
-/** Wait after startup before the first check, so launching stays quiet. */
 const INITIAL_DELAY_MS = 3000;
 
-/** How often to look for an update already installed by another pane or due for a check. */
 const POLL_INTERVAL_MS = 60_000;
 
-/** Minimum gap between GitHub API requests across all open Claudesaurus instances. */
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;
 
-/** Timeout for checking the GitHub release metadata. */
 const CHECK_TIMEOUT_MS = 8000;
 
-/** How long a lock file or staging folder is treated as active before recovery. */
 const STALE_LOCK_MS = 15 * 60 * 1000;
 
-/** Keep at least the newest two installed versions alongside the running one. */
 const KEEP_VERSIONS = 2;
 
-/** Plain MAJOR.MINOR.PATCH version, safe as a single folder name inside runtimeHome. */
 const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 
 export type ReleaseInfo = {
@@ -94,7 +85,6 @@ export function isSemver(value: string) {
   return SEMVER_RE.test(value);
 }
 
-/** Compares two MAJOR.MINOR.PATCH strings. Returns >0 if a > b, <0 if a < b, 0 if equal. */
 export function compareVersions(a: string, b: string) {
   const left = SEMVER_RE.exec(a);
   const right = SEMVER_RE.exec(b);
@@ -106,7 +96,6 @@ export function compareVersions(a: string, b: string) {
   return 0;
 }
 
-/** Parses GitHub's `/releases/latest` JSON into a downloadable release, or null if unusable. */
 export function parseLatestRelease(json: string): ReleaseInfo | null {
   let raw: z.input<typeof GithubReleaseSchema>;
   try {
@@ -127,7 +116,6 @@ export function parseLatestRelease(json: string): ReleaseInfo | null {
   return { version, url: asset.browser_download_url, sha256 };
 }
 
-/** Whether Electron in `root` kept its macOS symlinks intact, matching `bin/runtime.mjs`. */
 export function electronIntact(root: string) {
   if (process.platform !== "darwin") return true;
   try {
@@ -152,7 +140,6 @@ export function isRuntimeReady(root: string, checkElectron = electronIntact) {
   );
 }
 
-/** The newest ready version in `home` strictly newer than `afterVersion`, or null. */
 export function latestInstalledVersion(
   home: string,
   afterVersion: string,
@@ -186,9 +173,7 @@ function writeCache(file: string, cache: UpdateCache) {
     const temp = `${file}.${process.pid}.tmp`;
     fs.writeFileSync(temp, `${JSON.stringify(cache, null, 2)}\n`);
     fs.renameSync(temp, file);
-  } catch {
-    // Cache writes are best-effort; another pane may write concurrently.
-  }
+  } catch {}
 }
 
 export type CheckReleaseOptions = {
@@ -201,10 +186,6 @@ export type CheckReleaseOptions = {
   fetchFn?: typeof fetch;
 };
 
-/**
- * Returns the latest release metadata, using a shared on-disk cache and ETag validation so
- * multiple Claudesaurus instances share one check per interval without hitting GitHub rate limits.
- */
 export async function checkLatestRelease(
   options: CheckReleaseOptions,
 ): Promise<ReleaseInfo | null> {
@@ -253,10 +234,6 @@ function isProcessAlive(pid: number) {
   }
 }
 
-/**
- * Acquires an exclusive lock file for installing `version`. Returns false when another live
- * instance already holds it; recovers locks whose owner exited or exceeded `STALE_LOCK_MS`.
- */
 function acquireLock(lockFile: string, now: number) {
   const tryCreate = () => {
     const fd = fs.openSync(lockFile, "wx");
@@ -274,7 +251,6 @@ function acquireLock(lockFile: string, now: number) {
     if (!code.success || code.data.code !== "EEXIST") return false;
   }
 
-  // Inspect existing lock to see if its owner is dead or timed out.
   try {
     const stat = fs.statSync(lockFile);
     const owner = Number.parseInt(fs.readFileSync(lockFile, "utf8").trim(), 10);
@@ -305,7 +281,6 @@ function besideNode(nodePath: string, program: string) {
   return path.isAbsolute(nodePath) && fs.existsSync(beside) ? beside : program;
 }
 
-/** Installs production dependencies in `staging` asynchronously without blocking the main loop. */
 function installRuntimeDependencies(staging: string, nodePath: string, signal?: AbortSignal) {
   const temporary = path.join(staging, ".tmp");
   fs.mkdirSync(temporary, { recursive: true });
@@ -355,7 +330,6 @@ function installRuntimeDependencies(staging: string, nodePath: string, signal?: 
   });
 }
 
-/** Removes old versions and stale staging folders while always keeping `currentVersion` and the newest two. */
 function pruneOldVersions(home: string, currentVersion: string, now: number) {
   try {
     const entries = fs.readdirSync(home);
@@ -370,9 +344,7 @@ function pruneOldVersions(home: string, currentVersion: string, now: number) {
       if (unfinished && now - fs.statSync(entry).mtimeMs < STALE_LOCK_MS) continue;
       fs.rmSync(entry, { recursive: true, force: true });
     }
-  } catch {
-    // Cleanup is best-effort.
-  }
+  } catch {}
 }
 
 export type InstallUpdateOptions = {
@@ -386,11 +358,6 @@ export type InstallUpdateOptions = {
   checkElectron?: (root: string) => boolean;
 };
 
-/**
- * Downloads, verifies, unpacks, and installs dependencies for `release` into `home/<version>`.
- * Coordinates across concurrent Claudesaurus instances via a lock file, and leaves the running
- * version untouched. Returns null when another instance is currently installing it.
- */
 export async function installUpdate(
   release: ReleaseInfo,
   options: InstallUpdateOptions,
@@ -472,10 +439,6 @@ export type AutoUpdaterOptions = {
   checkElectron?: (root: string) => boolean;
 };
 
-/**
- * Checks for new Claudesaurus releases in the background, downloads and installs them into the
- * runtime folder, and calls `onUpdateReady` once a newer version is ready for `/restart`.
- */
 export function startAutoUpdater(options: AutoUpdaterOptions) {
   const home = options.home ?? runtimeHome();
   const cacheFile = options.cacheFile ?? updateCacheFile();
@@ -501,7 +464,6 @@ export function startAutoUpdater(options: AutoUpdaterOptions) {
     if (stopped || checking) return;
     checking = true;
     try {
-      // Another pane may have already finished installing a newer release.
       const existing = latestInstalledVersion(home, notifiedVersion, checkElectron);
       if (existing) notify(existing);
 
@@ -529,7 +491,6 @@ export function startAutoUpdater(options: AutoUpdaterOptions) {
       });
       if (installed) notify(installed);
     } catch {
-      // Background updates must never disturb the active chat.
     } finally {
       checking = false;
       schedule(pollIntervalMs);

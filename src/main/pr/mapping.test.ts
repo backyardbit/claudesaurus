@@ -212,7 +212,6 @@ const conversation: Conversation = {
       state: "APPROVED",
       submittedAt: "2026-01-01T04:00:00Z",
     },
-    // The container GitHub opens for line comments, which carries nothing of its own.
     {
       id: "PRR_2",
       author: { login: "bob" },
@@ -331,7 +330,6 @@ test("activity joins comments, review summaries and line comments into one conve
   expect(byId.get("IC_1")?.reactions).toEqual([
     { content: "eyes", count: 1, actors: [], viewerHasReacted: true },
   ]);
-  // Nobody in the GraphQL read named bob's picture, so GitHub's own URL for it stands in.
   expect(byId.get("PRR_1")?.author?.avatarUrl).toBe("https://github.com/bob.png?size=80");
   expect(byId.get("PRR_1")?.url).toBe("https://github.com/owner/repo/pull/7#pullrequestreview-1");
   expect(byId.get("PRR_3")?.author?.avatarUrl).toBeNull();

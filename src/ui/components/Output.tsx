@@ -3,7 +3,6 @@ import { useState } from "react";
 
 const COLLAPSED_LINES = 8;
 
-/** Plain monospace output that folds after a few lines. */
 export function Output({ text, tone = "normal" }: { text: string; tone?: "normal" | "error" }) {
   const [expanded, setExpanded] = useState(false);
   const lines = text.replace(/\n$/, "").split("\n");

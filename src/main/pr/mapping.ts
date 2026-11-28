@@ -1,7 +1,3 @@
-/**
- * How GitHub's answers become the viewer's contract, after T3 Code's gitHubPullRequestJson.ts and
- * GitHubPullRequestProvider.ts (MIT).
- */
 import type {
   PullRequestActor,
   PullRequestCapabilities,
@@ -51,10 +47,6 @@ export function toActor(raw: RawActor): PullRequestActor | null {
     : { login, name: trimmed(raw?.name), avatarUrl: trimmed(raw?.avatarUrl) };
 }
 
-/**
- * The picture GitHub serves for any user at `/<login>.png`, for an actor `gh pr view --json`
- * reported without one. Null for an app (`dependabot[bot]`), whose guessed URL would 404.
- */
 export function loginAvatarUrl(login: string) {
   return /^[a-z0-9][a-z0-9-]{0,38}$/i.test(login)
     ? `https://github.com/${login}.png?size=80`
@@ -87,10 +79,6 @@ export function gitHubReactionContent(content: PullRequestReactionContent) {
   return GITHUB_REACTION[content];
 }
 
-/**
- * The reaction groups somebody chose. GitHub sends a group for every content, chosen or not. The
- * viewer is left out of `actors`, since the page names them "You", but still counted.
- */
 export function toReactions(groups: RawReactionGroups, viewer: string | null) {
   const me = viewer?.toLowerCase() ?? null;
   const reactions: PullRequestReaction[] = [];
@@ -130,10 +118,6 @@ function toMergeability(value: string | null | undefined): PullRequestMergeabili
   }
 }
 
-/**
- * A check run reports `status` and, once completed, a `conclusion`; a commit status reports one
- * `state`. Both are read here into one status.
- */
 export function toCheckStatus(raw: RawCheck): PullRequestCheckStatus {
   const status = raw.status?.trim().toUpperCase();
   if (status !== undefined && status !== "" && status !== "COMPLETED") return "pending";
@@ -144,7 +128,6 @@ export function toCheckStatus(raw: RawCheck): PullRequestCheckStatus {
     case "ERROR":
     case "TIMED_OUT":
     case "STARTUP_FAILURE":
-    // A completed check asking for manual intervention blocks the merge; it is not neutral.
     case "ACTION_REQUIRED":
       return "failure";
     case "CANCELLED":
@@ -159,7 +142,6 @@ export function toCheckStatus(raw: RawCheck): PullRequestCheckStatus {
   }
 }
 
-/** What GitHub writes where a run has not reached that moment yet. */
 const UNSET_TIMESTAMP = "0001-01-01T00:00:00Z";
 
 function realTimestamp(value: string | null | undefined) {
@@ -167,11 +149,6 @@ function realTimestamp(value: string | null | undefined) {
   return at === null || at === UNSET_TIMESTAMP ? null : at;
 }
 
-/**
- * One row per check rather than one per run. A re-run lists the same check twice; the newest run
- * replaces the older one where it stood. Two survivors sharing a name come from different
- * workflows and are shown as `workflow / name`, the way GitHub writes them.
- */
 export function toChecks(raw: (RawCheck | null | undefined)[]) {
   type Entry = { check: PullRequestCheck; workflow: string | null; at: string | null };
   const newest = new Map<string, Entry>();
@@ -194,7 +171,6 @@ export function toChecks(raw: (RawCheck | null | undefined)[]) {
     };
     const key = `${entry.workflow ?? ""} ${name}`;
     const kept = newest.get(key);
-    // ISO timestamps in UTC compare as text; a tie goes to the later row, as a re-run is listed last.
     const newer =
       kept === undefined ||
       (entry.at === null ? kept.at === null : kept.at === null || entry.at >= kept.at);
@@ -212,10 +188,6 @@ export function toChecks(raw: (RawCheck | null | undefined)[]) {
   );
 }
 
-/**
- * Everyone on the review: those still asked and those who already answered, since answering
- * takes a person off the request list. Keyed by login, so nobody appears twice.
- */
 function toReviewers(requests: RawReviewRequests, latest: RawLatestReviews) {
   const reviewers = new Map<string, PullRequestActor>();
   for (const raw of [
@@ -256,22 +228,12 @@ export const CAPABILITIES: PullRequestCapabilities = {
 };
 
 export type ViewerAccess = {
-  /** A role that can push: ADMIN, MAINTAIN or WRITE. */
   canWrite: boolean;
-  /** GitHub's `viewerCanUpdate`, true for the author as well as for anyone with write. */
   canUpdate: boolean;
   didAuthor: boolean;
-  /** GitHub's `viewerCanUpdateBranch`, which is false where the branch is already current. */
   canUpdateBranch: boolean;
 };
 
-/**
- * What this account may do here. Merging, and arming or disarming an auto-merge, need write
- * access. Closing, reopening and moving in and out of draft go by `viewerCanUpdate`, which the
- * author has with read access alone. Anyone may comment and review, except that GitHub refuses
- * an author's approval or request for changes on their own pull request. Resolving needs write,
- * or authorship; asking for reviews needs write.
- */
 export function toViewerPermissions(access: ViewerAccess): PullRequestViewerPermissions {
   const permissions: PullRequestViewerPermissions = {
     actions: [
@@ -293,10 +255,6 @@ function canWrite(viewerPermission: string | null | undefined) {
   return role === "ADMIN" || role === "MAINTAIN" || role === "WRITE";
 }
 
-/**
- * The compare ref for the branch's base comparison, `owner:branch`, or null where there is
- * nothing worth comparing: a closed pull request, or one whose head repository is gone.
- */
 export function comparisonHeadRef(response: DetailResponse) {
   const pullRequest = response.data.repository.pullRequest;
   const owner = trimmed(pullRequest.headRepositoryOwner?.login);
@@ -304,7 +262,6 @@ export function comparisonHeadRef(response: DetailResponse) {
   return `${owner}:${pullRequest.headRefName}`;
 }
 
-/** `behindBy` is null where the comparison was not made or failed, which reads as unknown. */
 export function toPullRequestDetail(
   response: DetailResponse,
   workspaceRoot: string,
@@ -320,7 +277,6 @@ export function toPullRequestDetail(
     capabilities: CAPABILITIES,
     viewerPermissions: toViewerPermissions({
       canWrite: canWrite(repository.viewerPermission),
-      // An install that does not say grants it, and GitHub's own refusal explains a failure.
       canUpdate: pullRequest.viewerCanUpdate !== false,
       didAuthor: pullRequest.viewerDidAuthor === true,
       canUpdateBranch: pullRequest.viewerCanUpdateBranch === true,
@@ -364,13 +320,11 @@ export function toPullRequestDetail(
   return detail;
 }
 
-/** The review states that are an event in themselves, rather than a wrapper for line comments. */
 function isVerdict(state: string | null) {
   const value = state?.toUpperCase();
   return value === "APPROVED" || value === "CHANGES_REQUESTED" || value === "DISMISSED";
 }
 
-/** True where Markdown would render nothing: whitespace, or only HTML comments. */
 function rendersEmpty(body: string) {
   return body.replace(/<!--[\s\S]*?-->/g, "").trim().length === 0;
 }
@@ -380,18 +334,12 @@ function commitAuthor(raw: {
   avatarUrl?: string | null;
   user?: { login?: string | null } | null;
 }): PullRequestActor | null {
-  // An unlinked signature has a name and no account; it still names who wrote the commit.
   const login = trimmed(raw.user?.login) ?? trimmed(raw.name);
   return login === null
     ? null
     : { login, name: trimmed(raw.name), avatarUrl: trimmed(raw.avatarUrl) };
 }
 
-/**
- * The conversation, the review threads and the commits, from `gh pr view --json comments,reviews`
- * and the pages of the activity query. `threadsCut` says the thread walk stopped before GitHub ran
- * out of pages.
- */
 export function toPullRequestActivity(
   conversation: Conversation,
   pages: ActivityResponse[],
@@ -402,7 +350,6 @@ export function toPullRequestActivity(
   const viewer = trimmed(first.data.viewer?.login);
   const pullRequest = first.data.repository.pullRequest;
 
-  // `gh pr view --json` reports no avatar for anyone, so they are collected from the GraphQL read.
   const avatars = new Map<string, string>();
   for (const raw of [
     pullRequest.author,
@@ -437,7 +384,6 @@ export function toPullRequestActivity(
     const url = trimmed(node?.url);
     if (url !== null) reviewUrls.set(id, url);
   }
-  // GitHub keeps a dismissal's reason on the timeline event, not on the review it dismissed.
   const dismissals = new Map<string, string>();
   for (const node of pullRequest.reviewDismissals?.nodes ?? []) {
     const id = trimmed(node?.review?.id);
@@ -460,7 +406,6 @@ export function toPullRequestActivity(
       reviewThreads.push({
         id,
         path,
-        // Null once the line has left the diff, which is when GitHub calls the thread outdated.
         line: thread.line != null && thread.line > 0 ? thread.line : null,
         side,
         isResolved: thread.isResolved === true,
@@ -490,8 +435,6 @@ export function toPullRequestActivity(
       reactions: reactionsById.get(comment.id) ?? [],
     }),
   );
-  // A bodiless COMMENTED review is only the container GitHub opens for line comments, which are
-  // read from the threads; an approval, a request for changes or a dismissal is kept bare.
   const reviews = (conversation.reviews ?? []).flatMap((review): PullRequestComment[] => {
     const submittedAt = trimmed(review.submittedAt);
     const reviewState = trimmed(review.state);
@@ -555,11 +498,6 @@ export function toPullRequestActivity(
   };
 }
 
-/**
- * The files API serves each file's hunks with no `diff --git` header, so the patch a diff parser
- * expects is assembled here. A file with no hunks is still listed: a pure rename has none to give,
- * while a binary or oversized file had its hunks withheld, which is reported as omitted.
- */
 export function filesToPatch(files: ChangedFile[]) {
   const sections: string[] = [];
   const omittedFileStats: PullRequestOmittedFileStat[] = [];
@@ -577,7 +515,6 @@ export function filesToPatch(files: ChangedFile[]) {
       status === "renamed" ? (trimmed(file.previous_filename) ?? file.filename) : file.filename;
     const header = [
       `diff --git a/${oldPath} b/${file.filename}`,
-      // The files API reports no mode, so the ordinary one stands in for added and deleted files.
       ...(status === "added" ? ["new file mode 100644"] : []),
       ...(status === "removed" ? ["deleted file mode 100644"] : []),
       ...(status === "renamed" ? [`rename from ${oldPath}`, `rename to ${file.filename}`] : []),
@@ -599,15 +536,10 @@ export const REVIEW_EVENTS = {
   "request-changes": "REQUEST_CHANGES",
 } satisfies { [verdict in PullRequestReviewVerdict]: string };
 
-/**
- * A drafted line comment as GitHub's `DraftPullRequestReviewThread`. An added line is on the new
- * side, a deleted one on the old; a context line is on whichever side the reader clicked.
- */
 export function toDraftThread(draft: PullRequestReviewCommentDraft) {
   return { path: draft.path, ...reviewAnchor(draft.position), body: draft.body };
 }
 
-/** Where GitHub pins a line comment: a line number counted in one side's file. */
 type ReviewAnchor = { line: number; side: "LEFT" | "RIGHT" };
 
 function reviewAnchor(position: PullRequestReviewPosition): ReviewAnchor {
@@ -623,12 +555,6 @@ function reviewAnchor(position: PullRequestReviewPosition): ReviewAnchor {
   }
 }
 
-/**
- * Who this pull request may be sent to, with whoever is already on it marked and listed first,
- * even where GitHub no longer counts them assignable, so a request can always be taken back. The
- * author is left out: GitHub refuses a review request to them. A candidate's `id` is the login or
- * team slug the REST requested_reviewers endpoint takes.
- */
 export function toReviewerCandidates(
   response: ReviewerCandidatesResponse,
 ): PullRequestReviewerCandidateList {
@@ -668,7 +594,6 @@ export function toReviewerCandidates(
   };
 }
 
-/** The body of POST or DELETE `requested_reviewers`, which takes people and teams apart. */
 export function reviewerRequestBody(reviewers: { id: string; kind: PullRequestReviewerKind }[]) {
   return JSON.stringify({
     reviewers: reviewers.filter((reviewer) => reviewer.kind === "user").map(({ id }) => id),
@@ -676,7 +601,6 @@ export function reviewerRequestBody(reviewers: { id: string; kind: PullRequestRe
   });
 }
 
-/** True when the subject is the pull request itself or hangs off it, and false otherwise. */
 export function subjectBelongs(response: SubjectScope) {
   const expected = response.data.repository?.pullRequest?.id ?? null;
   const node = response.data.node;

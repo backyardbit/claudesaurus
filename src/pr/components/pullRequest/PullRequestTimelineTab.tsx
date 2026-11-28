@@ -39,7 +39,6 @@ import {
   PullRequestMetaLine,
 } from "./pullRequestPresentation";
 
-/** What every comment on the timeline needs to react; only the subject differs between them. */
 interface ReactionSurface {
   readonly canReact: boolean;
   readonly reference: PullRequestRef;
@@ -153,7 +152,6 @@ function ConversationCard({
   reactions,
 }: {
   event: PullRequestTimelineEvent;
-  /** The remark behind this entry, only where this reader may rewrite it. */
   editable: PullRequestComment | null;
   cwd: string;
   onOpen: (url: string) => void;
@@ -164,8 +162,6 @@ function ConversationCard({
   const updateComment = usePrCommand("updateComment");
 
   const save = async (body: string) => {
-    // A review's own summary is not a kind any host rewrites, which is why `editable` is never
-    // one; the check is here because the comment's own type still allows it.
     if (editable === null || saving || editable.kind === "review") return;
     setSaving(true);
     const result = await updateComment({
@@ -310,9 +306,6 @@ function ConversationGroup({
               <div className="mt-1 space-y-1">
                 {events.map((event) => (
                   <ConversationCard
-                    // Named with the pull request too: a remark's id is the host's own, and two
-                    // pull requests can hand out the same one — which would leave one card's open
-                    // editor standing over the other's remark.
                     key={`${reactions.reference.repository}#${reactions.reference.number}:${event.id}`}
                     event={event}
                     editable={editable.get(event.id) ?? null}
@@ -422,8 +415,6 @@ export function PullRequestTimelineTab({
     reference,
     onRefresh,
   };
-  // A timeline entry keeps only what it draws, so the remarks this reader may rewrite are looked
-  // up here by the id the entry carries.
   const editable = new Map(
     detail.comments
       .filter((comment) => canEditPullRequestComment(detail, comment))

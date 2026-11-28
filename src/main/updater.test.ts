@@ -31,7 +31,6 @@ afterEach(() => {
   }
 });
 
-/** Builds a release-shaped `.tar.gz` archive containing `claudesaurus-<version>/...`. */
 function makeReleaseArchive(dir: string, version: string, pkgVersion = version) {
   const name = `claudesaurus-${version}`;
   const src = path.join(dir, name);
@@ -156,7 +155,6 @@ test("shares update checks via disk cache and ETag 304 without burning rate limi
   expect(first?.version).toBe("0.3.1");
   expect(calls).toBe(1);
 
-  // Within the interval, a second instance reads the disk cache and makes no network request.
   currentTime += 10_000;
   const cached = await checkLatestRelease({
     url: "https://example.test/latest",
@@ -169,7 +167,6 @@ test("shares update checks via disk cache and ETag 304 without burning rate limi
   expect(cached?.version).toBe("0.3.1");
   expect(calls).toBe(1);
 
-  // After the interval expires, sends If-None-Match and keeps the cached release on 304.
   currentTime += 60_000;
   const revalidated = await checkLatestRelease({
     url: "https://example.test/latest",
@@ -211,7 +208,6 @@ test("downloads, verifies SHA-256, extracts, installs, and keeps the running ver
   expect(result).toEqual({ version: "0.3.1", root: path.join(home, "0.3.1") });
   expect(installedIn).not.toBeNull();
   expect(fs.existsSync(path.join(home, "0.3.1", "dist", "main.cjs"))).toBe(true);
-  // Running version 0.3.0 stays untouched; older 0.2.0 is pruned.
   expect(fs.existsSync(path.join(home, "0.3.0"))).toBe(true);
   expect(fs.existsSync(path.join(home, "0.2.0"))).toBe(false);
   expect(latestInstalledVersion(home, "0.3.0", () => true)).toEqual(result);
@@ -260,7 +256,6 @@ test("skips install when a live lock exists and recovers stale locks from dead p
   const { bytes, sha256 } = makeReleaseArchive(dir, "0.3.2");
   const fetchFn: typeof fetch = async () => new Response(bytes, { status: 200 });
 
-  // Active lock owned by this live process causes another instance to skip.
   const lockFile = path.join(home, "0.3.2.lock");
   fs.writeFileSync(lockFile, `${process.pid}\n`);
   const skipped = await installUpdate(
@@ -276,7 +271,6 @@ test("skips install when a live lock exists and recovers stale locks from dead p
   );
   expect(skipped).toBeNull();
 
-  // Lock owned by a non-existent PID is recovered and installation completes.
   fs.writeFileSync(lockFile, "99999999\n");
   const recovered = await installUpdate(
     { version: "0.3.2", url: "https://example.test/claudesaurus-0.3.2.tar.gz", sha256 },

@@ -61,8 +61,6 @@ interface ButtonProps extends useRender.ComponentProps<"button"> {
   size?: VariantProps<typeof buttonVariants>["size"];
 }
 
-// Forwards its ref because React 18 does not pass `ref` as a prop the way T3 Code's React 19 does,
-// and base-ui triggers that render a Button need the element to place their popups against it.
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { className, variant, size, render, ...props },
   ref,

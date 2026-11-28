@@ -295,6 +295,11 @@ pnpm lint:slop   # just the anti-slop lint
 `tools/oxlint/anti-slop/` is a copy of Dillon Mulroy's anti-slop Oxlint plugin, configured in
 `.oxlintrc.json` with every rule at `error`. Biome and Oxlint leave the copy itself alone.
 
+`tools/oxlint/no-comments/` bans comments in JS and TS. It allows only what a tool reads: a
+shebang, `/// <reference>`, `biome-ignore`, `oxlint-` and `eslint-` directives, `@ts-` pragmas,
+`#__PURE__`-style annotations, and the `SAFETY:` notes anti-slop requires on type assertions
+(with the `//` lines that continue them). `pnpm exec oxlint --fix` deletes the rest.
+
 Set `CLAUDESAURUS_DEBUG_DIR` to a folder to log every message sent to the page
 (`messages.jsonl`) and keep a screenshot of the page as Chromium drew it (`page.png`). With
 `rex split`, `rex send` and `rex send-key`, that is enough to drive and check a real run without

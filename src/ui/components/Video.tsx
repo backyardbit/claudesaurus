@@ -5,10 +5,7 @@ import { videoName, videoUrl } from "../video";
 
 const CONVERT = "Convert it to MP4 with H.264 video, or to WebM.";
 
-/** Why a video cannot play, in words, from what Chromium reported. */
 function failure(video: HTMLVideoElement) {
-  // Chromium reports a file it could not read as a bare "Format error", and one it read but could
-  // not take apart or decode with the pipeline status that stopped it.
   if (!video.error?.message.startsWith("PipelineStatus")) {
     return "The file could not be opened. Check that it exists.";
   }
@@ -17,7 +14,6 @@ function failure(video: HTMLVideoElement) {
 
 type PlayerProps = { url: string; title: string; onProblem(problem: string): void };
 
-/** Plays only when the user starts it, and pauses out of view: every frame is drawn in the terminal. */
 function Player({ url, title, onProblem }: PlayerProps) {
   const video = useRef<HTMLVideoElement>(null);
 
@@ -51,7 +47,6 @@ function Player({ url, title, onProblem }: PlayerProps) {
   );
 }
 
-/** A video a reply shows with Markdown image syntax, or why it cannot be played. */
 export function Video({ src, title }: { src: string; title: string }) {
   const cwd = useAppState((state) => state.session?.cwd ?? null);
   const url = videoUrl(src, cwd);

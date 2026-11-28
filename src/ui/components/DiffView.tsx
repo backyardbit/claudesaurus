@@ -9,7 +9,6 @@ export type DiffRow = {
   text: string;
 };
 
-/** The unified hunks Claude Code reports for a finished edit, which carry real line numbers. */
 export function patchHunks(response: ToolResponse | null) {
   const patch = response?.structuredPatch;
   return patch && patch.length > 0 ? patch : null;
