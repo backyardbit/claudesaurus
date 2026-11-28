@@ -32,7 +32,6 @@ type Summary = {
   icon: LucideIcon;
   label: string;
   detail: string;
-  /** Detail that is code (a path, a pattern) rather than prose. */
   mono?: boolean;
   badge?: string;
 };
@@ -108,7 +107,6 @@ function contentText(tool: ToolState) {
   return parts.join("\n");
 }
 
-/** The adapter wraps command output in a ```console fence; the card shows it bare. */
 function stripFence(text: string) {
   const match = /^```[a-z]*\n([\s\S]*?)\n?```\s*$/.exec(text.trim());
   return match?.[1] ?? text;
@@ -135,7 +133,6 @@ function diffRows(response: ToolResponse | null, content: ToolState["content"]) 
   return rows;
 }
 
-/** A whole HTML or SVG file that Claude just wrote, which can be shown live. */
 function writtenPage(tool: ToolState) {
   if (tool.toolName !== "Write") return null;
   const file = tool.input.file_path ?? "";
@@ -151,7 +148,6 @@ function resultCount(tool: ToolState) {
   return null;
 }
 
-/** Tools whose row already says what was asked, so only their result is worth showing. */
 const SELF_DESCRIBING = new Set([
   "Read",
   "Grep",

@@ -16,14 +16,12 @@ export function formatTokens(count: number) {
   return String(count);
 }
 
-/** Shortens a directory to its last two segments, with `~` for the home directory. */
 export function shortPath(path: string) {
   const home = path.replace(/^\/(?:home|Users)\/[^/]+/, "~");
   const parts = home.split("/");
   return parts.length <= 3 ? home : `…/${parts.slice(-2).join("/")}`;
 }
 
-/** How long ago a time was, in its largest whole unit: "just now", "5m ago", "3d ago". */
 export function formatAge(iso: string, now: number) {
   const seconds = Math.max(0, (now - Date.parse(iso)) / 1000);
   if (Number.isNaN(seconds)) return "";

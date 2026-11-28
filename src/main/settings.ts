@@ -3,12 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 
-/** The saved choices; one that is missing or unknown falls back to its default. */
 const SettingsSchema = z.object({
   drawing: z.enum(["tiles", "patches"]).catch("tiles"),
-  /** `/zen`: the conversation without tool calls and thoughts. */
   zen: z.boolean().catch(false),
-  /** The agent `/agent` last switched to, by ACP registry id or short name. */
   agent: z.string().catch("claude"),
 });
 
@@ -21,7 +18,6 @@ function settingsFile() {
   return path.join(config, "claudesaurus", "settings.json");
 }
 
-/** Reads the user's saved choices, falling back to the defaults for any that are missing. */
 export function loadSettings(file = settingsFile()): Settings {
   try {
     return SettingsSchema.catch(DEFAULTS).parse(JSON.parse(fs.readFileSync(file, "utf8")));

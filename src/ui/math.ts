@@ -1,7 +1,5 @@
-/** Fenced blocks and inline code spans, which are never math. */
 const CODE = /(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`[^`\n]*`)/g;
 
-/** A dollar sign that starts an amount of money, like `$5`, `$1,200.50` or `$3k`. */
 const MONEY = /\$(?=\d[\d,.]*[kKmMbB]?(?:[\s.,;:!?)\]]|$))/g;
 
 const DISPLAY = "$$";
@@ -28,11 +26,6 @@ function normalizeProse(prose: string) {
     .replace(/^[ \t]*\$\$(.+?)\$\$[ \t]*$/gm, (_, body: string) => displayBlock(body));
 }
 
-/**
- * Rewrites the math Claude writes into the forms remark-math reads: `\(…\)` and `\[…\]` become
- * dollar delimiters, a one-line `$$…$$` becomes a display block, and amounts of money keep their
- * dollar sign instead of opening a formula.
- */
 export function normalizeMath(text: string) {
   return text
     .split(CODE)

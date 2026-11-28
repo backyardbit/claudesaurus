@@ -31,9 +31,7 @@ function svgDataUrl(source: string) {
 type CodeBlockProps = {
   language: string | null;
   source: string;
-  /** The highlighted code, shown as the source view. */
   children: ReactNode;
-  /** While the block is still being written, the preview waits. */
   streaming: boolean;
 };
 

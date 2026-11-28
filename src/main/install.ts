@@ -8,10 +8,8 @@ import type { BinaryTarget } from "./registry";
 
 const run = promisify(execFile);
 
-/** Written into an agent's folder once it is fully in place. */
 const INSTALLED_MARKER = ".claudesaurus-installed";
 
-/** The least change in download progress worth reporting, as a fraction. */
 const PROGRESS_STEP = 0.05;
 
 export type InstallProgress = (status: string) => void;
@@ -22,7 +20,6 @@ export async function sha256Of(file: string) {
   return hash.digest("hex");
 }
 
-/** Throws unless the file's SHA-256 is the expected one. Case does not matter. */
 export async function verifySha256(file: string, expected: string) {
   const actual = await sha256Of(file);
   if (actual !== expected.toLowerCase()) {
@@ -30,7 +27,6 @@ export async function verifySha256(file: string, expected: string) {
   }
 }
 
-/** How an archive is unpacked, by the end of its address: zip, tar, or a bare program. */
 export function archiveKind(url: string) {
   const name = new URL(url).pathname.toLowerCase();
   if (name.endsWith(".zip")) return "zip";
@@ -39,10 +35,6 @@ export function archiveKind(url: string) {
   return "raw";
 }
 
-/**
- * Unpacks an archive into a folder with the system's own tools, which keep symlinks and file
- * modes: a signed macOS bundle whose symlinks became copies fails its signature check.
- */
 export async function extractArchive(archive: string, kind: string, destination: string) {
   fs.mkdirSync(destination, { recursive: true });
   if (kind === "zip") {
@@ -56,7 +48,6 @@ export async function extractArchive(archive: string, kind: string, destination:
   }
 }
 
-/** The path of the program an entry names, which must stay inside the agent's folder. */
 export function commandPath(folder: string, cmd: string) {
   const resolved = path.resolve(folder, cmd);
   const relative = path.relative(folder, resolved);
@@ -82,11 +73,6 @@ async function download(url: string, file: string, progress: (fraction: number) 
   await pipeline(counted(), fs.createWriteStream(file));
 }
 
-/**
- * Puts an agent's binary release in `home/agents/ID/VERSION` and returns that folder. A version
- * already there is used as it is. The archive is checked against the registry's SHA-256, and
- * everything happens beside the final folder, which appears only once it is complete.
- */
 export async function installBinary(
   home: string,
   agent: { id: string; name: string; version: string },
@@ -126,7 +112,6 @@ export async function installBinary(
       await extractArchive(archive, kind, staging);
     }
     fs.writeFileSync(path.join(staging, INSTALLED_MARKER), `${target.archive}\n`);
-    // Another pane may have finished the same install meanwhile; its copy is as good.
     if (fs.existsSync(path.join(folder, INSTALLED_MARKER))) return folder;
     fs.rmSync(folder, { recursive: true, force: true });
     fs.renameSync(staging, folder);

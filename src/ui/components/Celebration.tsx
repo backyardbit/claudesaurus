@@ -12,43 +12,25 @@ import {
   translate,
 } from "./Dinosaur";
 
-/**
- * The party for a merged pull request, which the agent asks for with its `celebrate` tool. The
- * rex runs in along the top of the composer in a party hat, stops, hops and roars twice while
- * confetti cannons fire from the composer's corners, and runs off to the right.
- */
-
-/** When the rex has run off; the confetti still falling after it ends the party. */
 const DINO_SECONDS = 4.4;
 
-/**
- * How often the party moves. Every frame is drawn again in the terminal, so this is its cost;
- * the working dinosaur gets by on twelve, but confetti at that rate stutters.
- */
 const FRAME_MS = 1000 / 30;
 
-/** With reduced motion the rex stands and grins, and no confetti flies, for this long. */
 const STILL_MS = 3000;
 const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Width of the rex on the page, in CSS pixels; its box is 64 units wide. */
 const DINO_WIDTH = 170;
 const UNIT = DINO_WIDTH / 64;
-/** Units above the rex's box the hat reaches, which the SVG leaves room for. */
 const HEADROOM = 12;
-/** Where its feet meet the ground, in its box. */
 const FEET = 37.3;
-/** Room the speech bubble needs from the page's right edge, in CSS pixels. */
 const BUBBLE_ROOM = 190;
 
-/** The hops: when the first starts, and how long each takes. */
 const HOPS_AT = 1.7;
 const HOP_SECONDS = 0.6;
 const HOPS = 2;
 
 const TAU = Math.PI * 2;
 
-/** Where the party happens: the top of the composer, its corners, and the page's size. */
 type Stage = { ground: number; left: number; right: number; width: number; height: number };
 
 function measureStage(): Stage {
@@ -60,11 +42,9 @@ function measureStage(): Stage {
 }
 
 type Party = {
-  /** Left edge of the rex's box on the page. */
   x: number;
   opacity: number;
   rex: RexPose;
-  /** How far the body is off the ground, in units. */
   lift: number;
   bubble: number;
 };
@@ -73,10 +53,8 @@ function span(t: number, from: number, to: number) {
   return clamp((t - from) / (to - from));
 }
 
-/** Where everything is `t` seconds into the party. */
 function partyAt(t: number, stage: Stage): Party {
   const middle = (stage.left + stage.right) / 2 - DINO_WIDTH / 2;
-  // It comes from the page's edge, or from close by on a page too wide to cross in time.
   const from = Math.max(-DINO_WIDTH - 20, middle - 640);
   const to = Math.min(stage.width + 20, middle + 900);
 
@@ -156,7 +134,6 @@ function PartyHat({ wobble }: { wobble: number }) {
   );
 }
 
-/** How far the hat tips back and forth as the rex hops, in degrees. */
 function hatWobble(t: number) {
   if (still || t < HOPS_AT || t >= HOPS_AT + HOPS * HOP_SECONDS) return 0;
   return -12 * Math.sin((((t - HOPS_AT) / HOP_SECONDS) % 1) * TAU);
@@ -177,7 +154,6 @@ type Bit = {
   round: boolean;
 };
 
-/** The theme's colors, so the confetti matches the page. */
 function confettiColors() {
   const style = getComputedStyle(document.documentElement);
   const named = ["--accent", "--blue", "--green", "--yellow", "--red"].map((name) =>
@@ -187,10 +163,8 @@ function confettiColors() {
 }
 
 const GRAVITY = 0.22;
-/** Confetti flutters down no faster than this, in pixels a sixtieth of a second. */
 const FALL = 3.4;
 
-/** A volley from both corners of the composer, aimed up and in, high enough to fill the page. */
 function volley(stage: Stage, count: number, colors: string[]) {
   const speed = Math.sqrt(2 * GRAVITY * stage.ground * 0.6);
   const bits: Bit[] = [];
@@ -220,7 +194,6 @@ function volley(stage: Stage, count: number, colors: string[]) {
   return bits;
 }
 
-/** Moves the confetti on by `steps` sixtieths of a second and draws it; false once it has all landed. */
 function drawConfetti(context: CanvasRenderingContext2D, bits: Bit[], steps: number, stage: Stage) {
   context.clearRect(0, 0, stage.width, stage.height);
   let flying = false;

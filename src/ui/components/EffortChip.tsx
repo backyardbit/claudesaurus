@@ -5,23 +5,15 @@ import { choices } from "../configChoices";
 import { useActions } from "../store";
 import { Popover } from "./Popover";
 
-/** How long the slider rests on a stop before the choice is sent, so a drag sends one change. */
 const COMMIT_DELAY_MS = 250;
 
-/** How long to wait for the adapter to confirm a change before showing its own value again. */
 const CONFIRM_TIMEOUT_MS = 3000;
 
-/** The hues the lowest and highest effort are drawn in: blue, through green and yellow, to red. */
 const LOWEST_HUE = 235;
 const HIGHEST_HUE = 25;
 
-/** The stop that means "whatever the model's default is", which is not a place on the scale. */
 const DEFAULT_VALUE = "default";
 
-/**
- * The color of one stop, cooler for less effort and warmer for more.
- * Returns null for the default stop, which has no level to show.
- */
 export function effortColor(values: string[], index: number) {
   const value = values[index];
   if (value === undefined || value === DEFAULT_VALUE) return null;
@@ -33,13 +25,8 @@ export function effortColor(values: string[], index: number) {
 
 type EffortStyle = CSSProperties & Record<"--effort-color" | "--effort-fraction", string>;
 
-/** Places a step's dot along the rail, as a fraction of the thumb's travel. */
 type StopStyle = CSSProperties & Record<"--stop", string>;
 
-/**
- * The effort setting as a pill that opens a slider with one stop per level. The pill and the
- * slider take the color of the chosen level.
- */
 export function EffortChip({ option }: { option: SessionConfigOption }) {
   const actions = useActions();
   const levels = choices(option);

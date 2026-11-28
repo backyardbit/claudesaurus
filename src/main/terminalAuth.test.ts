@@ -2,7 +2,6 @@ import { expect, test } from "vitest";
 import { type LaunchCommand, shellCommand, terminalLogin } from "./agent";
 import { rexPaneArgs } from "./launch";
 
-/** Claude's adapter as Claudesaurus launches it, and its own `terminal` sign-in method. */
 const claude: LaunchCommand = {
   command: "/usr/local/bin/node",
   args: ["/app/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js"],

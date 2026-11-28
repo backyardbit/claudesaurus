@@ -8,22 +8,15 @@ const CHUNKS_PER_REPLY = 240;
 const PARAGRAPH =
   "This is replayed text, streamed in small pieces the way a real answer arrives, with `inline code`, **bold words** and enough length to wrap across several lines of the conversation. ";
 
-/** Claude, as a recording made before sessions named their agent ran it. */
 const RECORDED_AGENT = { id: "claude-acp", name: "Claude" };
 const RECORDED_FEATURES = { resume: true, steer: true, systemPrompt: true, embeddedContext: true };
 
-/** Fills in what a session record from an older recording leaves out. */
 function upgrade(message: MainMessage): MainMessage {
   if (message.type !== "session") return message;
   const { agent = RECORDED_AGENT, features = RECORDED_FEATURES } = message.session;
   return { ...message, session: { ...message.session, agent, features } };
 }
 
-/**
- * Development aid, used when `CLAUDESAURUS_REPLAY` names a `messages.jsonl` recorded by the debug
- * capture: shows that conversation without starting Claude, and answers every prompt with a
- * streamed canned reply. It makes a long conversation free and repeatable to measure.
- */
 export function createReplayAgent(file: string, emit: (message: MainMessage) => void): Agent {
   let timer: NodeJS.Timeout | null = null;
 
@@ -64,7 +57,6 @@ export function createReplayAgent(file: string, emit: (message: MainMessage) => 
         emit({ type: "turnEnded", stopReason: "end_turn" });
       }, CHUNK_INTERVAL_MS);
     },
-    // The canned reply that is streaming carries on; the page already shows the message.
     async steer() {},
     async cancel() {
       stopStreaming();

@@ -181,7 +181,6 @@ test("reporter writes 0700/0600 state file, updates on change, rereports on SIGC
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
   }
 
-  // Identical state is not re-sent.
   reporter.update({
     version: 1,
     kind: "chat",
@@ -191,7 +190,6 @@ test("reporter writes 0700/0600 state file, updates on change, rereports on SIGC
   });
   expect(written).toHaveLength(1);
 
-  // Starting a conversation updates the file and emits a fresh timestamped report.
   timeMs += 5000;
   reporter.update({
     version: 1,
@@ -208,19 +206,16 @@ test("reporter writes 0700/0600 state file, updates on change, rereports on SIGC
     sessionId: "015d3962-6f9e-45c3-92bc-c7cef5068215",
   });
 
-  // SIGCONT re-emits with a fresh timestamp.
   timeMs += 10_000;
   reporter.rereport();
   expect(written).toHaveLength(3);
   expect(written[2]).toContain("time=1795543215:");
 
-  // Intentional quit deletes the state file and emits clear=1.
   timeMs += 1000;
   reporter.clear();
   expect(fs.existsSync(file)).toBe(false);
   expect(written).toHaveLength(4);
   expect(written[3]).toBe(encodeClearResume({ pid: 74877, time: 1795543216, token: SPEC_TOKEN }));
-  // Rereport after clear does nothing.
   reporter.rereport();
   expect(written).toHaveLength(4);
 });
@@ -300,7 +295,6 @@ test("resolveResumeFileArgs expands chat, empty chat, PR and missing resume file
     "backyardbit/claudesaurus#42",
   ]);
 
-  // Missing or invalid state files fall back cleanly to a normal start.
   expect(resolveResumeFileArgs(["--resume-file", path.join(dir, "missing.json")])).toEqual([]);
   const corrupt = path.join(dir, "corrupt.json");
   fs.writeFileSync(corrupt, "not json");

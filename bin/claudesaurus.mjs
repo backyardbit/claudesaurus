@@ -53,19 +53,13 @@ examples:
 const appRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { version } = JSON.parse(readFileSync(path.join(appRoot, "package.json"), "utf8"));
 const args = process.argv.slice(2);
-// The outermost launcher is the process attached directly to the user's shell (or PTY root), so
-// OSC 7577 reports its PID rather than Electron's and keeps ownership stable across delegation
-// and /restart.
 const ownerPid = process.env.CLAUDESAURUS_OWNER_PID || String(process.pid);
 
 const home = runtimeHome();
 const inRuntimeHome = isInsideDir(appRoot, home);
-// A source checkout has its dependencies beside it outside the user's runtime folder.
 const fromSource = !inRuntimeHome && existsSync(path.join(appRoot, "node_modules"));
 const packaged = !fromSource || process.env.CLAUDESAURUS_PACKAGED === "1";
 
-// Packaged installs hand off to a newer version that auto-update already installed in the
-// background, unless this run is setting up this install or removing Rex actions.
 if (
   packaged &&
   !process.env.CLAUDESAURUS_DELEGATED &&
@@ -103,15 +97,11 @@ if (args.includes("--remove-rex-actions")) {
   process.exit(0);
 }
 
-// How to start this install again, for the Rex palette actions and for the panes the app opens
-// itself. The Homebrew wrapper names itself, which outlasts upgrades; a source checkout is
-// started with node.
 const launcher = process.env.CLAUDESAURUS_LAUNCHER;
 const command = launcher ? [launcher] : [process.execPath, fileURLToPath(import.meta.url)];
 
 function updateRexActions(sourceRoot) {
   if (!existsSync(path.join(sourceRoot, "rex", "claudesaurus.lua"))) return;
-  // Every run keeps the Rex palette actions in step with this install.
   try {
     installRexActions(sourceRoot, command);
   } catch (error) {
@@ -121,7 +111,6 @@ function updateRexActions(sourceRoot) {
 
 updateRexActions(appRoot);
 
-// A packaged install fetches its runtime on first use; a delegated runtime folder already has it.
 const initialRoot =
   fromSource || (inRuntimeHome && isRuntimeReady(appRoot))
     ? appRoot
@@ -137,7 +126,6 @@ let currentVersion = version;
 let currentArgs = resolveResumeFileArgs(args);
 
 while (true) {
-  // `claudesaurus pr` runs the pull request viewer, which has its own entry and never restarts.
   const viewingPullRequest = currentArgs[0] === "pr";
   const entry = path.join(currentRoot, "dist", viewingPullRequest ? "pr.cjs" : "main.cjs");
   if (!existsSync(entry)) {

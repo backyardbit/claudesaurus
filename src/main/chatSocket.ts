@@ -4,10 +4,6 @@ import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 
-/**
- * One line of JSON on a chat's socket: a task a PR viewer hands the chat, or word from the
- * chat's `celebrate` tool that a pull request was merged.
- */
 const ChatMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("draft"), text: z.string() }),
   z.object({ type: z.literal("celebrate"), pr: z.number().int().nullable() }),
@@ -24,18 +20,11 @@ function parseMessage(line: string) {
   }
 }
 
-/**
- * A socket that programs started for this chat write to: a PR viewer it opened, which puts tasks
- * in its composer the way T3 Code puts them in the thread its pull request panel sits beside,
- * and the agent's `celebrate` tool. It lives in a folder only this user can read, and is made the
- * first time it is asked for.
- */
 export function createChatSocket(onMessage: (message: ChatMessage) => void) {
   let socketPath: string | null = null;
   let server: net.Server | null = null;
 
   return {
-    /** The socket's path, listening from the first call on. */
     path() {
       if (socketPath) return socketPath;
       const directory = fs.mkdtempSync(path.join(os.tmpdir(), "claudesaurus-chat-"));
@@ -51,9 +40,7 @@ export function createChatSocket(onMessage: (message: ChatMessage) => void) {
           if (message) onMessage(message);
           connection.end(message ? "ok\n" : "refused\n");
         });
-        connection.on("error", () => {
-          // A sender that went away mid-message has nothing left to tell.
-        });
+        connection.on("error", () => {});
       });
       server.listen(socketPath);
       return socketPath;
@@ -65,7 +52,6 @@ export function createChatSocket(onMessage: (message: ChatMessage) => void) {
   };
 }
 
-/** Hands `message` to the chat listening at `socketPath`; rejects when that chat is gone. */
 export function sendToChat(socketPath: string, message: ChatMessage) {
   return new Promise<void>((resolve, reject) => {
     const connection = net.createConnection(socketPath);

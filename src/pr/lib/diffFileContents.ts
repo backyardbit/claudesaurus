@@ -50,7 +50,6 @@ function createDiffFileContentsLoader(
   };
 }
 
-/** Loads host-backed PR files, which may name revisions this checkout has never fetched. */
 export function createPullRequestDiffFileContentsLoader(
   getDiffFileContents: GetPullRequestDiffFileContents,
   source: PullRequestDiffFileContentsSource,

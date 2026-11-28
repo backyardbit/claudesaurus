@@ -25,7 +25,6 @@ afterEach(() => {
   fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-/** A folder holding a program and a symlink to it, as a signed bundle has. */
 function makeRelease() {
   const release = path.join(scratch, "release");
   fs.mkdirSync(path.join(release, "bin"), { recursive: true });

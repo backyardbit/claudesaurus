@@ -6,15 +6,6 @@ import { cn } from "~/lib/utils";
 import ChatMarkdown from "../ChatMarkdown";
 import { splitPullRequestBody } from "./pullRequestMarkdown.logic";
 
-/**
- * A pull request body, rendered with the app's markdown renderer plus a card for each upload
- * embedded in it, which that renderer drops on the floor.
- *
- * The card copies the upload's link instead of playing it in place. A
- * `github.com/user-attachments/assets/…` link is a 302 to a signed URL that needs the viewer's
- * GitHub session, and serves the file as uploaded — `video/quicktime` for anything recorded on a
- * Mac, which no Chromium decodes — so a player here would be a box that never fills in.
- */
 export function PullRequestMarkdown({
   text,
   className,

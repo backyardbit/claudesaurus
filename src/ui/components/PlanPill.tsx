@@ -9,7 +9,6 @@ function EntryIcon({ status }: { status: PlanEntry["status"] }) {
   return <Circle size={14} className="dim" />;
 }
 
-/** The current step of Claude's todo list, expanding to the whole list. */
 export function PlanPill({ plan }: { plan: PlanEntry[] }) {
   const [open, setOpen] = useState(false);
   const done = plan.filter((entry) => entry.status === "completed").length;

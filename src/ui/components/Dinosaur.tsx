@@ -1,11 +1,5 @@
 import { type ReactNode, useId } from "react";
 
-/**
- * The dinosaur that works alongside Claude, drawn as a pure function of the time since the turn
- * began. Over one loop an egg wobbles and hatches, the baby grows up in three spurts with the top
- * of its shell for a hat, stomps about, lays an egg and runs off, which leaves the egg the next
- * loop hatches.
- */
 export const LOOP_SECONDS = 11;
 
 const TAU = Math.PI * 2;
@@ -17,13 +11,8 @@ export const scaleAbout = (s: number, x: number, y: number) =>
   `translate(${x} ${y}) scale(${n(s)}) translate(${-x} ${-y})`;
 export const clamp = (x: number) => Math.max(0, Math.min(1, x));
 export const ease = (x: number) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
-/** Eases in with an overshoot, for the boing of a growth spurt. */
 const overshoot = (x: number) => 1 + 2.9 * (x - 1) ** 3 + 1.9 * (x - 1) ** 2;
 
-/**
- * A leg swinging from its hip, lifting its foot while it swings forward, and turned a further
- * `tuck` degrees, as it is in the air.
- */
 export function leg(
   stride: number,
   amp: number,
@@ -39,7 +28,6 @@ export function leg(
 type Puff = { cx: string; cy: string; r: string; opacity: string };
 const NO_PUFF: Puff = { cx: "0", cy: "0", r: "0", opacity: "0" };
 
-/** The dust each foot kicks up as it lands, `stride` radians into the walk at `pace`. */
 export function dust(stride: number, pace: number) {
   return (
     [
@@ -67,11 +55,9 @@ export function dust(stride: number, pace: number) {
   });
 }
 
-/** Where every moving part is at `u` seconds into the loop. */
 function pose(u: number) {
   const span = (a: number, b: number) => clamp((u - a) / (b - a));
 
-  // The egg hatches at the start of the loop and is laid whole again at the end.
   const laid = u >= 9.75;
   const e = laid ? 0 : u;
   const eggSpan = (a: number, b: number) => clamp((e - a) / (b - a));
@@ -101,7 +87,6 @@ function pose(u: number) {
       : NO_PUFF,
   );
 
-  // The rex comes out small, grows in three spurts, lays an egg and runs off to the right.
   const size =
     0.3 +
     0.15 * overshoot(span(3.35, 3.65)) +
@@ -109,7 +94,6 @@ function pose(u: number) {
     0.2 * overshoot(span(6.6, 6.9)) +
     0.15 * overshoot(span(8, 8.3));
   const x = 8 * ease(span(9.2, 9.7)) + 46 * span(10.25, 10.95) ** 2;
-  // How hard it is walking: it stops to lay the egg and runs off faster.
   const pace =
     u < 9.6
       ? ease(span(3.5, 3.8))
@@ -118,7 +102,6 @@ function pose(u: number) {
         : 1.3 * ease(span(10.15, 10.3));
   const p = u * TAU * 1.5;
   const squat = Math.sin(Math.PI * span(9.6, 10.1));
-  // Babies have big eyes.
   const young = clamp(1 - (size - 0.45) / 0.55);
   const pupil = 1.15 + 0.45 * young;
   const hatOff = ease(span(6.6, 7.2));
@@ -156,7 +139,6 @@ function pose(u: number) {
 
 const EGG =
   "M32 5.5C40 5.5 45.5 17 45.5 25.5C45.5 32.5 39.5 37 32 37C24.5 37 18.5 32.5 18.5 25.5C18.5 17 24 5.5 32 5.5Z";
-/** Where the shell cracks, from left to right. */
 const CRACK = "21,21 24,18.3 27,21.6 30,18.3 33,21.6 36,18.3 39,21.6 42,18.3 47,21";
 const SPOTS = [
   [27, 12, 1.6],
@@ -188,7 +170,6 @@ function Puffs({ puffs }: { puffs: Puff[] }) {
   );
 }
 
-/** Where the grown rex's moving parts are, as SVG transforms in its 64 by 40 box. */
 export type RexPose = {
   farLeg: string;
   nearLeg: string;
@@ -201,16 +182,12 @@ export type RexPose = {
   pupil: string;
   blink: boolean;
   dust: Puff[];
-  /** Raises the body off the ground for a hop, leaving the shadow where it is. */
   lift?: string;
   shadow?: string;
-  /** How much of the inside of the mouth shows, from 0 to 1, for a roar. */
   maw?: string;
-  /** Eyes shut in a grin. */
   happy?: boolean;
 };
 
-/** The grown rex, wearing `hat` on its head. */
 export function Rex({ pose, hat }: { pose: RexPose; hat: ReactNode }) {
   return (
     <>
@@ -279,7 +256,6 @@ export function Rex({ pose, hat }: { pose: RexPose; hat: ReactNode }) {
   );
 }
 
-/** The dinosaur `seconds` into a turn. */
 export function Dinosaur({ seconds }: { seconds: number }) {
   const id = `dino${useId().replace(/:/g, "")}`;
   const top = `${id}-top`;

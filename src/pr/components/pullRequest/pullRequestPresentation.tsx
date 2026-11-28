@@ -30,14 +30,6 @@ interface StatePresentation {
   readonly Icon: typeof GitPullRequestIcon;
 }
 
-/**
- * How a pull request's state reads on this page. Open, closed and merged use the same ink as
- * the thread badge in `ThreadStatusIndicators`, so one pull request cannot look like two
- * different things in two places; draft and conflicts are states that badge never shows.
- *
- * Draft outranks conflicts: a draft is not heading for a merge yet, so conflicts only surface
- * once it is real work.
- */
 export function resolvePullRequestState(input: {
   readonly state: PullRequestState;
   readonly isDraft: boolean;
@@ -67,8 +59,6 @@ export function resolvePullRequestState(input: {
   }
   if (input.mergeability === "conflicting") {
     return {
-      // "Has conflicts" leaves out the one thing a reader wants when the warning triangle catches
-      // their eye, so name the branch it collides with wherever the caller knows it.
       label: input.baseBranch ? `Conflicts with ${input.baseBranch}` : "Has conflicts",
       toneClassName: "text-destructive",
       Icon: TriangleAlertIcon,
@@ -102,8 +92,6 @@ export function PullRequestStateGlyph({
   });
   return (
     <Tooltip>
-      {/* The list row is itself a button, so the trigger stays a span: an interactive one would
-          nest a control inside that button and steal the row's click target. */}
       <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
         <presentation.Icon
           role="img"
@@ -146,10 +134,6 @@ export function PullRequestCheckStatusIcon({ status }: { status: PullRequestChec
   );
 }
 
-/**
- * The rollup a listing row carries, which is one word rather than the checks behind it. The
- * headline is GitHub's own wording, so a reader who knows that page reads this one the same way.
- */
 const CHECKS_STATE_PRESENTATION = {
   passing: {
     label: "All checks have passed",
@@ -175,12 +159,6 @@ export function pullRequestChecksStatePresentation(state: PullRequestChecksState
   return CHECKS_STATE_PRESENTATION[state];
 }
 
-/**
- * The same rollup the server sends with a listing row, worked out here from the checks a detail
- * already holds — so the header shows the icon without a second field travelling with it.
- *
- * Null for a change request with no checks: nothing to show beats a tick nobody earned.
- */
 export function pullRequestChecksState(
   checks: ReadonlyArray<PullRequestCheck>,
 ): PullRequestChecksState | null {
@@ -201,7 +179,6 @@ export function PullRequestActorAvatar({
   const login = actor?.login ?? "ghost";
   const avatarUrl = actor?.avatarUrl ?? null;
   return avatarUrl === null ? (
-    // Not every host reports an avatar, so the initial stands in where none arrives.
     <span
       aria-hidden
       className={cn(
@@ -222,7 +199,6 @@ export function PullRequestActorAvatar({
   );
 }
 
-/** GitHub attributes work from a deleted account to "ghost"; say the same word everywhere. */
 export function PullRequestActorLabel({
   actor,
   className,
@@ -239,7 +215,6 @@ export function PullRequestActorLabel({
   );
 }
 
-/** Added and removed lines, coloured the way every host colours them. */
 export function PullRequestDiffStat({
   additions,
   deletions,
@@ -249,8 +224,6 @@ export function PullRequestDiffStat({
   deletions: number;
   className?: string;
 }) {
-  // Not every host reports line counts. Showing "+0 -0" would read as an empty change set
-  // rather than as a missing one, so the stat is left out instead.
   if (additions === 0 && deletions === 0) {
     return null;
   }
@@ -264,13 +237,6 @@ export function PullRequestDiffStat({
   );
 }
 
-/**
- * Dot-separated metadata. It owns the separator, and draws one only between the segments that
- * survive, so a caller can render `{condition ? <span/> : null}` without leaving a stray dot.
- * `Children.toArray` drops the nullish entries and keys what remains, which a plain array
- * check would not do for a single child or a fragment. A separator borrows the key of the
- * segment it precedes, so it stays stable without counting positions.
- */
 function separatorKey(segment: ReactNode): string {
   return `separator:${isValidElement(segment) ? String(segment.key) : String(segment)}`;
 }

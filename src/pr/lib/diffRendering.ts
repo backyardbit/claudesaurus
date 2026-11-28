@@ -72,12 +72,6 @@ export function getDiffLineStat(files: ReadonlyArray<FileDiffMetadata>): DiffLin
 }
 
 interface RenderablePatchOptions {
-  /**
-   * Pierre's partial-patch parser keeps hunk render starts in source-file
-   * coordinates. Its virtualizer iterates partial patches as compact rows, so
-   * review diffs need compact render starts while retaining collapsedBefore
-   * for the "N unmodified lines" separator.
-   */
   compactPartialHunkOffsets?: boolean;
 }
 
@@ -151,10 +145,6 @@ export function resolveFileDiffPath(fileDiff: FileDiffMetadata): string {
   return raw;
 }
 
-/**
- * What the file was called before the change. Only a rename makes it differ from the current
- * path, and the hosts that resolve a diff position against both sides need both names.
- */
 export function resolveFileDiffPreviousPath(fileDiff: FileDiffMetadata): string {
   const raw = fileDiff.prevName ?? fileDiff.name ?? "";
   if (raw.startsWith("a/") || raw.startsWith("b/")) {
@@ -185,12 +175,6 @@ export function getDiffCollapseIconClassName(fileDiff: FileDiffMetadata): string
   }
 }
 
-/**
- * Maps every diff/file surface the @pierre/diffs renderer paints onto the
- * app's code tokens, so themed palettes reach the code body, gutter, and
- * row tints instead of the renderer's bundled colors. Shared by the diff
- * panel and the file preview.
- */
 export const DIFF_SURFACE_THEME_UNSAFE_CSS = `
 [data-diffs-header],
 [data-diff],

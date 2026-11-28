@@ -29,39 +29,23 @@ import type {
 } from "../shared/protocol";
 import { agentFeatures, pickStartupConfig } from "./capabilities";
 
-/** A program to run, with the variables it needs on top of the app's environment. */
 export type LaunchCommand = { command: string; args: string[]; env: Map<string, string> };
 
 export type AgentOptions = {
-  /** Directory the agent works in. */
   cwd: string;
   env: NodeJS.ProcessEnv;
-  /** The agent's registry id, and the name to show until its entry is read. */
   agent: AgentIdentity;
-  /**
-   * Installs the agent if it needs to be, reporting how far along it is, and says how to run it
-   * and what it is called.
-   */
   prepare(report: (detail: string) => void): Promise<{ name: string; launch: LaunchCommand }>;
-  /** Settings given on the command line, by name: model, effort and mode. */
   startupConfig: ReadonlyMap<string, string>;
-  /** A past session to open instead of starting a new one. */
   resume: ResumeTarget | null;
-  /** Text for the agent's system prompt, describing what this client can display. */
   systemPromptAppend: string;
-  /** MCP servers every session gets, such as the one with the `celebrate` tool. */
   mcpServers: McpServer[];
-  /**
-   * Opens a terminal pane running the command, for a login the agent does in a terminal, and
-   * resolves to whether it succeeded once it exits. Null where no pane can be opened.
-   */
   openTerminal(command: LaunchCommand, label: string): Promise<boolean> | null;
   emit(message: MainMessage): void;
 };
 
 export type ResumeTarget = { kind: "session"; sessionId: string } | { kind: "latest" };
 
-/** The adapter's `auth/status_update` notification: the accounts it can use. */
 const AuthStatusSchema = z.object({
   accounts: z
     .array(
@@ -76,34 +60,24 @@ const AuthStatusSchema = z.object({
 
 const STDERR_TAIL_BYTES = 4000;
 
-/** ACP's error code for a request that needs the user to sign in first. */
 const AUTH_REQUIRED = -32000;
 
 const AuthRequiredSchema = z.object({ code: z.literal(AUTH_REQUIRED) });
 
-/** Where the note on what the page draws comes from, for agents that take it as a prompt block. */
 const CONTEXT_URI = "claudesaurus://display-guide";
 
-/**
- * The most pages of past sessions to read. Codex pages through every session it has and leaves
- * out those from other folders, so this folder's older ones can be several pages in, after pages
- * with none.
- */
 const MAX_SESSION_PAGES = 20;
 
-/** The extension request that adds a message to the turn that is running. */
 const STEER_METHOD = "_session/steering";
 
 type SteerResponse = { outcome: "injected" | "promptRequired" | "startedNewTurn" };
 
-/** What a failed request threw, as text: its message when it has one. */
 const ErrorMessageSchema = z.union([
   z.object({ message: z.string() }).transform(({ message }) => message),
   z.unknown().transform(String),
 ]);
 
 export function createAgent(options: AgentOptions) {
-  /** Once another agent takes over, nothing this one still has in flight reaches the page. */
   function emit(message: MainMessage) {
     if (!disposed) options.emit(message);
   }
@@ -121,7 +95,6 @@ export function createAgent(options: AgentOptions) {
   let launch: LaunchCommand | null = null;
   let authMethods: AuthMethod[] = [];
   let auth: AuthRequest | null = null;
-  /** True until the session's first prompt, for agents that get the note in it. */
   let contextPending = false;
   let stderrTail = "";
   let disposed = false;
@@ -217,7 +190,6 @@ export function createAgent(options: AgentOptions) {
     content: [{ type: "text", text: options.systemPromptAppend }],
   };
 
-  /** Makes a session the current one and tells the page, which starts its conversation afresh. */
   function announce(id: string, configOptions: SessionConfigOption[], loadingHistory: boolean) {
     sessionId = id;
     auth = null;
@@ -236,7 +208,6 @@ export function createAgent(options: AgentOptions) {
     });
   }
 
-  /** Applies the command line's settings that the session has options for. */
   async function applyStartupConfig(configOptions: SessionConfigOption[]) {
     const { applied, skipped } = pickStartupConfig(options.startupConfig, configOptions);
     for (const { configId, value } of applied) await setConfig(configId, value);
@@ -245,7 +216,6 @@ export function createAgent(options: AgentOptions) {
     emit({ type: "error", fatal: false, message: `${agent.name} has no setting for ${flags}.` });
   }
 
-  /** The session fields that carry the note on what the page draws, where the agent takes it. */
   function promptFields() {
     return features.systemPrompt ? { systemPrompt } : {};
   }
@@ -260,7 +230,6 @@ export function createAgent(options: AgentOptions) {
     await applyStartupConfig(session.configOptions ?? []);
   }
 
-  /** Opens a past session. The agent replays its conversation as updates while it loads. */
   async function loadSession(active: ClientConnection, id: string) {
     announce(id, [], true);
     const session = await active.agent.request(methods.agent.session.load, {
@@ -274,7 +243,6 @@ export function createAgent(options: AgentOptions) {
     await applyStartupConfig(session.configOptions ?? []);
   }
 
-  /** The sessions started in this directory, newest first. */
   async function pastSessions(active: ClientConnection): Promise<PastSession[]> {
     const sessions: SessionInfo[] = [];
     let cursor: string | null = null;
@@ -300,7 +268,6 @@ export function createAgent(options: AgentOptions) {
     return (await pastSessions(active))[0]?.sessionId ?? null;
   }
 
-  /** The past session the command line asks for, if the agent can reopen one. */
   async function resumeId(active: ClientConnection) {
     const { resume } = options;
     if (!resume) return null;
@@ -312,7 +279,6 @@ export function createAgent(options: AgentOptions) {
     return resume.kind === "session" ? resume.sessionId : await latestSessionId(active);
   }
 
-  /** Opens the first session, or asks the user to sign in when the agent needs that first. */
   async function openFirst(active: ClientConnection) {
     try {
       const id = await resumeId(active);
@@ -364,7 +330,6 @@ export function createAgent(options: AgentOptions) {
     }
   }
 
-  /** Signs in with one of the agent's methods, then opens the session it was waiting for. */
   async function authenticate(methodId: string) {
     const method = authMethods.find((candidate) => candidate.id === methodId);
     if (!connection || !launch || !method) return;
@@ -413,10 +378,6 @@ export function createAgent(options: AgentOptions) {
     }
   }
 
-  /**
-   * The note on what the page draws, for an agent that takes no system prompt: a resource the
-   * first prompt carries, or plain text where the agent takes no resources.
-   */
   function contextBlock(): ContentBlock {
     const text = options.systemPromptAppend;
     if (!features.embeddedContext) return { type: "text", text: `${text}\n\n---\n\n` };
@@ -447,10 +408,6 @@ export function createAgent(options: AgentOptions) {
     }
   }
 
-  /**
-   * Sends a message into the turn that is running instead of after it. If that turn has just
-   * ended, the adapter leaves the message to us, and it starts a turn of its own.
-   */
   async function steer(text: string, images: PromptImage[]) {
     if (!connection || !sessionId || !features.steer) return;
     try {
@@ -567,19 +524,12 @@ export function createAgent(options: AgentOptions) {
 
 export type Agent = ReturnType<typeof createAgent>;
 
-/** Where Claude reports the tool call's tool, by its full MCP name. */
 const ClaudeToolMetaSchema = z.object({ claudeCode: z.object({ toolName: z.string() }) });
 
-/** Where Antigravity reports an MCP tool call's server and tool. */
 const McpToolMetaSchema = z.object({ mcp: z.object({ server: z.string(), tool: z.string() }) });
 
-/** Titles agents give the call when they name its tool in no other way. */
 const CELEBRATE_TITLES = new Set(["claudesaurus: celebrate", "claudesaurus_celebrate"]);
 
-/**
- * Whether a tool call is the `celebrate` tool Claudesaurus serves, which does nothing but play an
- * animation and so needs no one's permission.
- */
 export function isCelebrateCall(toolCall: ToolCallUpdate) {
   const claude = ClaudeToolMetaSchema.safeParse(toolCall._meta);
   if (claude.success) return claude.data.claudeCode.toolName === "mcp__claudesaurus__celebrate";
@@ -602,10 +552,6 @@ function authChoice(method: AuthMethod): AuthChoice {
   };
 }
 
-/**
- * The command for a `terminal` sign-in: the agent as it is launched, with the method's
- * arguments added and its variables on top, as ACP's `AuthMethodTerminal` describes.
- */
 export function terminalLogin(
   launch: LaunchCommand,
   method: { args?: string[]; env?: { [name: string]: string } },
@@ -617,12 +563,10 @@ export function terminalLogin(
   };
 }
 
-/** Quotes a word for a POSIX shell, unless it needs none. */
 function shellWord(word: string) {
   return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replaceAll("'", "'\\''")}'`;
 }
 
-/** A command as it would be typed in a terminal, variables first. */
 export function shellCommand(command: LaunchCommand) {
   const variables = [...command.env].map(([name, value]) => `${name}=${shellWord(value)}`);
   return [...variables, command.command, ...command.args]

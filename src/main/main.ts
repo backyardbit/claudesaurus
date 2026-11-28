@@ -37,7 +37,6 @@ const resumeToken = takeResumeToken();
 
 const GITHUB_PULL_REQUEST_URL = /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/;
 
-/** Variables the pixel runtime sets for itself; the agent's shell commands must not inherit them. */
 const RUNTIME_ENV_PREFIXES = ["ELECTRON_", "PIXEL_", "CHROME_"];
 
 function agentEnv() {
@@ -50,7 +49,6 @@ function agentEnv() {
   return env;
 }
 
-/** A flag left without its value is left out, as if it was not given. */
 const optionalString = z.string().optional().catch(undefined);
 
 const FlagsSchema = z.object({
@@ -78,20 +76,14 @@ const { values } = parseArgs({
 });
 const flags = FlagsSchema.parse(values);
 
-/** A task the PR viewer left for this chat, put in the composer the first time the page loads. */
 let draft = takeDraftFile(flags["draft-file"]);
 
-/**
- * Tasks from a PR viewer this chat opened, put in the composer as they arrive, and the agent's
- * `celebrate` calls, played on the page as they come.
- */
 const chatSocket = createChatSocket((message) => {
   if (message.type === "celebrate") emit(message);
   else if (pageReady) view.webContents.send(MAIN_CHANNEL, message satisfies MainMessage);
   else draft = message.text;
 });
 
-/** Session settings given on the command line, by name. */
 function startupConfig() {
   const config = new Map<string, string>();
   for (const name of ["model", "effort", "mode"] as const) {
@@ -101,22 +93,15 @@ function startupConfig() {
   return config;
 }
 
-/** The past session the command line asks for: `--resume ID`, or `--continue` for the latest here. */
 function resumeTarget(): ResumeTarget | null {
   if (flags.resume !== undefined) return { kind: "session", sessionId: flags.resume };
   return flags.continue ? { kind: "latest" } : null;
 }
 
-/**
- * Writes an escape sequence to the terminal beside the frames PixelGUI draws. One short write is
- * never mixed into another program's write, so it cannot land inside a frame.
- */
 function writeToTerminal(sequence: string) {
   try {
     fs.writeSync(process.stdout.fd, sequence);
-  } catch {
-    // Status reports are a courtesy; a terminal that cannot take one must not stop the chat.
-  }
+  } catch {}
 }
 
 const status = createStatusReporter(writeToTerminal);
@@ -148,7 +133,6 @@ const debug = debugDirectory ? startDebugCapture(debugDirectory, view.webContent
 if (debugDirectory) {
   root.setLogFile(path.join(debugDirectory, "engine.log"));
   setInterval(() => debug?.note("stats", { at: Date.now(), ...root.surfaceStats() }), 1000);
-  // SIGUSR2 starts an engine profile, and a second one stops it and notes where it was saved.
   let profiling = false;
   process.on("SIGUSR2", async () => {
     profiling = !profiling;
@@ -159,7 +143,6 @@ if (debugDirectory) {
 
 const settings = loadSettings();
 
-/** `CLAUDESAURUS_RENDER` overrides PixelGUI's render settings, for measuring: '{"maxFps":10}'. */
 function applyDrawing() {
   root.setRender({
     tiles: settings.drawing === "patches" ? "off" : "auto",
@@ -168,7 +151,6 @@ function applyDrawing() {
 }
 applyDrawing();
 
-/** Everything sent since the session began, replayed when the page (re)loads. */
 let history: MainMessage[] = [];
 let pageReady = false;
 
@@ -190,7 +172,6 @@ function readAppVersion() {
   }
 }
 
-/** How long a title made from the first thing asked in a session may be. */
 const PROMPT_TITLE_LENGTH = 80;
 
 function promptTitle(text: string) {
@@ -198,11 +179,6 @@ function promptTitle(text: string) {
   return line.length > PROMPT_TITLE_LENGTH ? `${line.slice(0, PROMPT_TITLE_LENGTH - 1)}…` : line;
 }
 
-/**
- * Past sessions with what this app remembers of them filled in: the agent's title, or the first
- * thing asked, where the agent lists none (Grok) or only a placeholder (Antigravity); and when
- * the session was last used, where the agent does not say.
- */
 function describeSessions(sessions: PastSession[]): PastSession[] {
   const described = sessions.map((past) => {
     const stored = sessionStore.get(past.sessionId);
@@ -216,7 +192,6 @@ function describeSessions(sessions: PastSession[]): PastSession[] {
   return described.toSorted((a, b) => time(b) - time(a));
 }
 
-/** Remembers which agent a session with a conversation belongs to, and what to call it. */
 function rememberSession(text: string | null) {
   if (!sessionId) return;
   sessionStore.update(sessionId, { agent: currentAgentId });
@@ -248,7 +223,6 @@ function emit(original: MainMessage) {
       : original;
   debug?.record(message);
   status.observe(message);
-  // Another agent starting replaces everything shown before, and its progress replaces itself.
   if (message.type === "connecting") {
     history = [];
     currentAgentId = message.agent.id;
@@ -290,13 +264,11 @@ function emit(original: MainMessage) {
       sessionStore.update(sessionId, { used: message.update.used, size: message.update.size });
     }
   }
-  // A list answers one request, and a page that reloads asks again. A party happens once.
   if (!["sessions", "agents", "celebrate"].includes(message.type)) history.push(message);
   if (pageReady) view.webContents.send(MAIN_CHANNEL, message);
   if (message.type === "historyLoaded") restoreUsage();
 }
 
-/** A reopened session gets the context usage it last reported, which Claude does not replay. */
 function restoreUsage() {
   const stored = sessionId ? sessionStore.get(sessionId) : null;
   if (stored?.used === undefined || stored.size === undefined) return;
@@ -312,7 +284,6 @@ const claude = {
   adapterEntry: path.join(path.dirname(adapterPackage), "dist", "index.js"),
 };
 
-/** The MCP server with the `celebrate` tool, which reaches this chat through its socket. */
 function celebrateServer(): McpServer {
   return {
     name: "claudesaurus",
@@ -322,11 +293,6 @@ function celebrateServer(): McpServer {
   };
 }
 
-/**
- * `--agent` picks the agent for this run. Without it, a session being reopened starts the agent
- * it belongs to, since no other can open it; anything else starts the one last picked with
- * `/agent`, in whichever pane that was.
- */
 const firstAgentId = resolveAgentId(
   flags.agent ??
     (flags.resume === undefined ? undefined : sessionStore.get(flags.resume)?.agent) ??
@@ -334,10 +300,6 @@ const firstAgentId = resolveAgentId(
 );
 let currentAgentId = firstAgentId;
 
-/**
- * Starts an agent. The first one gets what the command line asked for; one picked later with
- * `/agent` starts plain, since a model or mode named for one agent rarely means much to another.
- */
 function startAgent(
   agentId: string,
   resume: ResumeTarget | null,
@@ -364,7 +326,6 @@ let agent: Agent = process.env.CLAUDESAURUS_REPLAY
   : startAgent(firstAgentId, resumeTarget(), startupConfig());
 if (process.env.CLAUDESAURUS_REPLAY) void agent.start();
 
-/** Starts a new session on another agent, and makes it the one the next launch starts with. */
 function switchAgent(nextId: string) {
   agent.dispose();
   pendingResumeId = null;
@@ -441,11 +402,6 @@ function toast(text: string) {
   view.webContents.send(MAIN_CHANNEL, { type: "toast", text } satisfies MainMessage);
 }
 
-/**
- * Following a link from the chat. A pull request opens in a viewer beside the chat when there is
- * Rex to split; anything else is copied, since the page cannot open a browser on the computer
- * the terminal runs on.
- */
 async function openLink(url: string) {
   if (rexBlock && GITHUB_PULL_REQUEST_URL.test(url)) {
     try {
@@ -461,8 +417,6 @@ async function openLink(url: string) {
 }
 
 view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
-  // A frame inside the page, such as an html block, must not be able to send prompts or answer
-  // permission requests, even if it reaches the channel.
   if (event.senderFrame !== view.webContents.mainFrame) return;
   switch (message.type) {
     case "ready":
@@ -542,8 +496,6 @@ view.webContents.ipc.on(UI_CHANNEL, (event, message: UiMessage) => {
   }
 });
 
-// Only the chat page itself reloading makes it lose what it was sent. Frames inside it, such as
-// an HTML preview, load all the time.
 view.webContents.on("did-start-navigation", (details) => {
   if (details.isMainFrame && !details.isSameDocument) pageReady = false;
 });

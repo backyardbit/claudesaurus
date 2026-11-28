@@ -6,7 +6,6 @@ import path from "node:path";
 const BEGIN = "-- >>> claudesaurus >>>";
 const END = "-- <<< claudesaurus <<<";
 
-/** Rex's config file, where Rex itself looks for it. */
 function rexConfigFile() {
   if (process.env.REX_CONFIG) return process.env.REX_CONFIG;
   const base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
@@ -17,7 +16,6 @@ function readOrEmpty(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
 }
 
-/** The Claudesaurus block in Rex's config, or null when it has none. */
 function blockIn(config) {
   const start = config.indexOf(BEGIN);
   const end = config.indexOf(END, start);
@@ -30,17 +28,11 @@ function withBlock(config, block) {
   return config.trim() === "" ? `${block}\n` : `${config.replace(/\n*$/, "\n")}\n${block}\n`;
 }
 
-/** Makes Rex load the changed config; a Rex that is not running reads it when it starts. */
 function reloadRex() {
   const { OSC7577_TOKEN: _unused, ...env } = process.env;
   execFile("rex", ["--autostart=false", "config", "reload"], { env }, () => {});
 }
 
-/**
- * Puts the Claudesaurus actions in Rex's command palette, or brings them up to date, when Rex is
- * set up on this machine. Leaves them out once `--remove-rex-actions` has taken them out.
- * `command` is how a new pane starts this install of Claudesaurus.
- */
 export function installRexActions(appRoot, command) {
   const configFile = rexConfigFile();
   const configDir = path.dirname(configFile);
@@ -51,7 +43,6 @@ export function installRexActions(appRoot, command) {
 
   const pluginFile = path.join(configDir, "plugins", "claudesaurus", "init.lua");
   const plugin = fs.readFileSync(path.join(appRoot, "rex", "claudesaurus.lua"), "utf8");
-  // JSON's string escapes are valid in Lua for the characters a path can hold.
   const setup = `dofile(${JSON.stringify(pluginFile)}).setup({ command = { ${command.map((part) => JSON.stringify(part)).join(", ")} } })`;
   const block = [
     BEGIN,
@@ -74,7 +65,6 @@ export function installRexActions(appRoot, command) {
   if (changed) reloadRex();
 }
 
-/** Takes the actions out of Rex, leaving a note in its config so later runs keep them out. */
 export function removeRexActions() {
   const configFile = rexConfigFile();
   const configDir = path.dirname(configFile);

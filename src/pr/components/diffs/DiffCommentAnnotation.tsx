@@ -27,7 +27,6 @@ interface DiffCommentAnnotationProps {
   secondaryAction?: DiffCommentSecondaryAction;
 }
 
-/** The shared inline comment treatment for file previews, thread diffs, and pull-request diffs. */
 export function DiffCommentAnnotation({
   kind,
   rangeLabel,

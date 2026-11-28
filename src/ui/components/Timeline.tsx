@@ -15,7 +15,6 @@ function NoticeIcon({ severity }: { severity: string }) {
 type ItemListProps = {
   items: Item[];
   permissions: PermissionRequest[];
-  /** True while Claude is still writing the last item. */
   streaming: boolean;
 };
 
@@ -32,10 +31,6 @@ function ItemList({ items, permissions, streaming }: ItemListProps) {
 
 type ItemViewProps = { item: Item; permissions: PermissionRequest[]; streaming: boolean };
 
-/**
- * One entry of the conversation. An item object is replaced only when it changes, so memoizing on
- * it keeps a long conversation from being redrawn for every piece of streamed text.
- */
 const ItemView = memo(function ItemView({ item, permissions, streaming }: ItemViewProps) {
   switch (item.kind) {
     case "user":
@@ -109,18 +104,12 @@ function toolCallIds(items: Item[], found = new Set<string>()) {
   return found;
 }
 
-/**
- * What `/zen` shows: only what was said, and errors. Tool calls (a subagent's work included),
- * thoughts and notices are hidden. Text on either side of a hidden call reads on as the next
- * paragraph.
- */
 export function zenItems(items: Item[]) {
   return items.filter(
     (item) => item.kind === "user" || item.kind === "assistant" || item.kind === "error",
   );
 }
 
-/** Permission requests with no tool card among `items` to sit under, shown after them. */
 export function loosePermissions(items: Item[], permissions: PermissionRequest[]) {
   if (permissions.length === 0) return permissions;
   const known = toolCallIds(items);
@@ -130,16 +119,13 @@ export function loosePermissions(items: Item[], permissions: PermissionRequest[]
 type TimelineProps = {
   items: Item[];
   permissions: PermissionRequest[];
-  /** True while a turn is running. */
   running: boolean;
   zen: boolean;
 };
 
 export function Timeline({ items, permissions, running, zen }: TimelineProps) {
   const shown = zen ? zenItems(items) : items;
-  // With the newest item hidden, the last one shown is finished, so its previews can render.
   const streaming = running && shown.at(-1) === items.at(-1);
-  // Zen hides the tool cards prompts sit under, so every prompt comes after the conversation.
   const orphans = loosePermissions(shown, permissions);
   return (
     <>

@@ -3,13 +3,11 @@ import { type ReactNode, useEffect, useRef } from "react";
 type PopoverProps = {
   open: boolean;
   onClose(): void;
-  /** The button that opens the popover. */
   trigger: ReactNode;
   children: ReactNode;
   align?: "left" | "right";
 };
 
-/** A panel that opens above its trigger and closes on Escape or a click elsewhere. */
 export function Popover({ open, onClose, trigger, children, align = "left" }: PopoverProps) {
   const container = useRef<HTMLDivElement>(null);
 

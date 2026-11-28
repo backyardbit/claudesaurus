@@ -12,12 +12,6 @@ import { checkOutPullRequest } from "./prCheckout";
 import { createResumeReporter, ownerPid, resumeCommand, takeResumeToken } from "./resume";
 import { focusPane, openChatPane } from "./rexPanes";
 
-/**
- * `claudesaurus pr [PR]`: a pull request, read and reviewed in this pane the way T3 Code shows
- * one. PR is a number of this folder's repository, `owner/repo#N`, or a pull request's URL; with
- * none, the pull request of the branch checked out here.
- */
-
 const run = promisify(execFile);
 const cwd = process.cwd();
 const resumeToken = takeResumeToken();
@@ -25,12 +19,9 @@ const resumeToken = takeResumeToken();
 function writeToTerminal(sequence: string) {
   try {
     fs.writeSync(process.stdout.fd, sequence);
-  } catch {
-    // Resume reports are a courtesy; a terminal that cannot take one must not stop the viewer.
-  }
+  } catch {}
 }
 
-/** The pull request of the branch checked out here, as `gh pr view` finds it. */
 async function currentBranchPullRequest() {
   try {
     const { stdout } = await run("gh", ["pr", "view", "--json", "url", "--jq", ".url"], { cwd });
@@ -52,10 +43,6 @@ const HandoffSchema = z.object({
   checkout: z.enum(["worktree", "local"]).nullable(),
 });
 
-/**
- * Hands a task to the chat that opened this viewer, when one did and is still there, and moves
- * the focus to it; otherwise opens a chat beside the viewer.
- */
 async function handToChat(
   chat: { socket: string; block: string | null } | null,
   where: { cwd: string; prompt: string | null },
@@ -65,9 +52,7 @@ async function handToChat(
       await sendToChat(chat.socket, { type: "draft", text: where.prompt });
       if (chat.block) await focusPane(chat.block);
       return "opened-from" as const;
-    } catch {
-      // The chat has closed since; a new one takes the task.
-    }
+    } catch {}
   }
   await openChatPane(where.cwd, where.prompt);
   return "new" as const;
@@ -123,7 +108,6 @@ async function main() {
     setInterval(() => debug?.note("stats", { at: Date.now(), ...root.surfaceStats() }), 1000);
   }
 
-  // Frames inside the page, such as an html block in a comment, must not reach GitHub.
   view.webContents.ipc.handle(PR_CHANNEL, async (event, operation: string, ...args) => {
     if (event.senderFrame !== view.webContents.mainFrame) {
       throw new Error("Only the viewer page may ask.");
@@ -139,8 +123,6 @@ async function main() {
       }
       case "handoff": {
         const handoff = HandoffSchema.parse(args[0]);
-        // A checkout is work of its own, so it always gets a chat on its branch; a question or a
-        // fix goes to the chat that opened this viewer, the way T3 Code's thread panel does it.
         if (handoff.checkout !== null) {
           const checkout = await checkOutPullRequest(cwd, handoff.reference, handoff.checkout);
           await openChatPane(checkout.cwd, handoff.prompt);

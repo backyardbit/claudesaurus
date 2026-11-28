@@ -18,7 +18,6 @@ import { prBridge } from "../lib/prApi";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
-/** GitHub's own Markdown allows these, and pull request bodies use them. */
 const sanitizeSchema = {
   ...defaultSchema,
   tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary", "picture", "source"],
@@ -50,7 +49,6 @@ function codeLanguage(node: Element | undefined) {
   return language ? language.slice("language-".length) : null;
 }
 
-/** A fenced block with T3 Code's header: its language, and wrap and copy buttons. */
 function CodeBlock({ node, children }: ComponentProps<"pre"> & { node?: Element }) {
   const [wrapped, setWrapped] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -134,7 +132,6 @@ const rehypePlugins: ComponentProps<typeof ReactMarkdown>["rehypePlugins"] = [
   [rehypeHighlight, { detect: false }],
 ];
 
-/** Markdown as T3 Code draws a pull request's description and comments. */
 const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
   return (
     <div className="chat-markdown w-full min-w-0 text-sm leading-relaxed text-foreground/80 [overflow-wrap:anywhere] [word-break:break-word]">

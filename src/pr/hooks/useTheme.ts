@@ -11,7 +11,6 @@ function subscribe(listener: () => void) {
   return () => observer.disconnect();
 }
 
-/** Light or dark, as the terminal's theme is, and the diff colours that go with it. */
 export function useTheme() {
   const resolvedTheme = useSyncExternalStore(subscribe, scheme);
   return { resolvedTheme, syntaxThemeName: resolveDiffThemeName(resolvedTheme) };

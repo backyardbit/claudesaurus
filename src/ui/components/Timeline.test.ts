@@ -16,7 +16,6 @@ function said(value: string, messageId: string): MainMessage {
   });
 }
 
-/** A turn that thinks, says something, runs a subagent that reads a file, then answers. */
 const turn = [
   { type: "userMessage", text: "Look around", images: [] },
   update({ sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "hmm" } }),

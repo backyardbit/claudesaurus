@@ -1,11 +1,3 @@
-/**
- * Asking someone to review, from the row that says who is already reviewing.
- *
- * The people who may be asked are read only once this menu opens: on a large repository that is
- * a list of everyone with access, which is worth a request when somebody wants it and worth
- * nothing on every pull request they merely open.
- */
-
 import { CheckIcon, UserPlusIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { PullRequestRef, PullRequestReviewerCandidate } from "~/contracts";
@@ -20,8 +12,6 @@ import { PullRequestPeopleGhost } from "./PullRequestGhosts";
 import { readableFailure } from "./pullRequestDetail.logic";
 import { PullRequestActorLabel } from "./pullRequestPresentation";
 
-/** Long lists are common — an organisation repository lists everyone — so what arrived can be
- * narrowed here. It narrows only what arrived: the host is asked once, when the menu opens. */
 function matches(candidate: PullRequestReviewerCandidate, query: string): boolean {
   if (query.length === 0) return true;
   const needle = query.toLowerCase();
@@ -37,17 +27,13 @@ export function PullRequestReviewerPicker({
   onRequested,
 }: {
   reference: PullRequestRef;
-  /** False where the host would refuse this account's request, which is worth saying rather than
-   * hiding: the control disabled with a reason answers the question its absence would raise. */
   allowed: boolean;
-  /** The detail carries who is requested, so it is re-read once the host has taken the change. */
   onRequested: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<string | null>(null);
 
-  // Mounted with the menu closed, so nothing is asked of the host until it opens.
   const candidatesQuery = usePrQuery(
     open ? prQuery("reviewerCandidates", { input: reference }) : null,
   );
@@ -162,8 +148,6 @@ export function PullRequestReviewerPicker({
             ))
           )}
           {candidatesQuery.data?.truncated ? (
-            // Typing filters what arrived; it does not ask the host again, so this says what the
-            // list is rather than offering a search that would find nothing further.
             <p className="px-2 py-1.5 text-xs text-muted-foreground">
               This repository has more people with access than are listed here. Ask for the rest on
               the host.

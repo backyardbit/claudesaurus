@@ -25,7 +25,6 @@ function luminance(color: number[]) {
   return (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
 }
 
-/** ANSI palette slots that drive the page's semantic colors. */
 const ANSI_VARIABLES: [index: number, variable: string][] = [
   [1, "--red"],
   [2, "--green"],
@@ -44,7 +43,6 @@ function apply(theme: TerminalTheme) {
   document.documentElement.dataset.scheme = luminance(theme.background) < 0.5 ? "dark" : "light";
 }
 
-/** Colors the page from the terminal's own theme, and keeps following it. */
 export function followTerminalTheme() {
   const pixel = window.pixel;
   if (!pixel) {

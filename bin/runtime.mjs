@@ -1,28 +1,17 @@
-// Sets up the packaged app's runtime dependencies on first use.
-//
-// A package manager such as Homebrew installs only the built app. PixelGUI's Electron runtime and
-// Claude Code's binary are signed programs that must stay exactly as published, and Homebrew
-// rewrites and re-signs every program it installs. So they are downloaded here instead, into the
-// user's data folder, the first time the app runs.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 
-/** The pnpm that wrote the lockfile. Newer ones skip the install scripts of dependencies. */
 export const PNPM = "pnpm@9.15.4";
 
-/** What `pnpm install` needs, and what then runs from the runtime folder. */
 const APP_FILES = ["package.json", "pnpm-lock.yaml", "patches", "bin", "dist", "rex"];
 
-/** How long an unfinished setup folder is left alone, in case another pane is still using it. */
 const STALE_SETUP_MS = 60 * 60 * 1000;
 
-/** Plain MAJOR.MINOR.PATCH version, safe as a single folder name inside runtimeHome. */
 const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 
-/** How many installed versions to keep when pruning older ones, so running panes keep working. */
 const KEEP_VERSIONS = 2;
 
 export function runtimeHome() {
@@ -30,7 +19,6 @@ export function runtimeHome() {
   return path.join(data, "claudesaurus");
 }
 
-/** Compares two MAJOR.MINOR.PATCH strings. Returns >0 if a > b, <0 if a < b, 0 if equal. */
 export function compareVersions(a, b) {
   const left = SEMVER_RE.exec(a);
   const right = SEMVER_RE.exec(b);
@@ -42,18 +30,11 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-/** True when `target` is inside `parent` (not equal to it, and not climbing out). */
 export function isInsideDir(target, parent) {
   const relative = path.relative(path.resolve(parent), path.resolve(target));
   return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
-/**
- * Whether the runtime's Electron is whole. On macOS the Electron framework is a bundle of
- * symlinks, and a copy that has them as plain files fails its signature check, so macOS refuses
- * to open it and calls it damaged. PixelGUI checks the same file to decide whether to install
- * Electron again.
- */
 export function electronIntact(root) {
   if (process.platform !== "darwin") return true;
   try {
@@ -70,7 +51,6 @@ export function electronIntact(root) {
   }
 }
 
-/** Whether `root` has a complete, runnable copy of Claudesaurus with intact Electron. */
 export function isRuntimeReady(root) {
   return (
     fs.existsSync(path.join(root, "package.json")) &&
@@ -79,10 +59,6 @@ export function isRuntimeReady(root) {
   );
 }
 
-/**
- * Finds the newest ready version installed in `home` that is strictly newer than `afterVersion`,
- * or null when none is installed.
- */
 export function latestInstalledVersion(home, afterVersion) {
   if (!fs.existsSync(home)) return null;
   let best = null;
@@ -112,12 +88,6 @@ function removeOtherVersions(home, version) {
   }
 }
 
-/**
- * Builds the CLI arguments for restarting after `/restart`. When a session is being resumed, the
- * resumed session carries its own settings, so old `--resume`, `--continue` and startup flags are
- * replaced with `--agent` and `--resume`. When restarting an empty session, startup flags such as
- * `--model` and `--effort` are preserved.
- */
 export function restartArgs(previousArgs, request) {
   const stripWithValue = new Set(["--resume", "--agent"]);
   const stripFlags = new Set(["--continue"]);
@@ -143,7 +113,6 @@ export function restartArgs(previousArgs, request) {
   return kept;
 }
 
-/** Returns a copy of `env` with `OSC7577_TOKEN` removed so child processes cannot forge resume reports. */
 export function envWithoutResumeToken(env = process.env) {
   const { OSC7577_TOKEN: _unused, ...clean } = env;
   return clean;
@@ -153,10 +122,6 @@ function nonEmptyString(value) {
   return String(value ?? "").length > 0 && value === String(value);
 }
 
-/**
- * Expands `--resume-file PATH` (written by OSC 7577 resume reporting) into normal CLI arguments.
- * Missing or unreadable files fall back to starting a normal session so resume is always safe.
- */
 export function resolveResumeFileArgs(args) {
   let file = null;
   const remaining = [];
@@ -201,10 +166,6 @@ export function resolveResumeFileArgs(args) {
   return remaining;
 }
 
-/**
- * Returns the folder to run the app from: a copy of the app with its dependencies installed.
- * Creates it if this version has not been set up yet, which needs the network.
- */
 export function prepareRuntime(appRoot, version) {
   const home = runtimeHome();
   const ready = path.join(home, version);
@@ -216,8 +177,6 @@ export function prepareRuntime(appRoot, version) {
       ? `The Claudesaurus ${version} runtime in ${home} has a damaged copy of Electron. Setting it up again, which takes about a minute.`
       : `Setting up Claudesaurus ${version} for first use. This downloads its runtime into ${home} and takes about a minute.`,
   );
-  // Set up beside the final folder and rename at the end, so a setup that is interrupted, or two
-  // panes that start at once, never leave a half-installed folder in its place.
   const staging = `${ready}.setup-${process.pid}`;
   fs.rmSync(staging, { recursive: true, force: true });
   fs.mkdirSync(staging, { recursive: true });
@@ -226,16 +185,12 @@ export function prepareRuntime(appRoot, version) {
     if (fs.existsSync(source)) fs.cpSync(source, path.join(staging, name), { recursive: true });
   }
 
-  // PixelGUI's install script moves Electron into place with a rename, which only works within
-  // one volume, so its temporary files go inside the folder they end up in.
   const temporary = path.join(staging, ".tmp");
   fs.mkdirSync(temporary);
   const nodeFolder = path.dirname(process.execPath);
   const npx = path.join(nodeFolder, "npx");
   const installed = spawnSync(
     fs.existsSync(npx) ? npx : "npx",
-    // pnpm's side-effects cache would put back PixelGUI as its install script last left it, from
-    // a store that keeps no symlinks, and skip the script, which leaves Electron broken on macOS.
     ["--yes", PNPM, "install", "--prod", "--frozen-lockfile", "--config.side-effects-cache=false"],
     {
       cwd: staging,
@@ -260,19 +215,14 @@ export function prepareRuntime(appRoot, version) {
   }
   fs.rmSync(temporary, { recursive: true, force: true });
 
-  // A damaged runtime is moved aside rather than deleted first, so a failed setup never leaves
-  // the folder missing; removeOtherVersions deletes it.
   if (existing) {
     try {
       fs.renameSync(ready, `${ready}.damaged-${process.pid}`);
-    } catch {
-      // Another pane moved it first.
-    }
+    } catch {}
   }
   try {
     fs.renameSync(staging, ready);
   } catch (error) {
-    // Another pane finished the same setup first.
     fs.rmSync(staging, { recursive: true, force: true });
     if (!fs.existsSync(ready)) throw error;
   }

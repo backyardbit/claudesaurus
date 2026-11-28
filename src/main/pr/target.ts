@@ -14,7 +14,6 @@ const URL_REF = new RegExp(
 
 const USAGE = "Name a pull request as 15, #15, owner/repo#15, or a github.com pull request URL.";
 
-/** `owner/name`, checked before it goes into a request path or a GraphQL variable. */
 export function splitRepository(repository: string) {
   if (!REPOSITORY.test(repository)) {
     throw new Error(`"${repository}" is not a GitHub repository name (owner/name).`);
@@ -30,10 +29,6 @@ export function checkNumber(number: number) {
   return number;
 }
 
-/**
- * What the user typed, as a repository (null where they gave only a number, which names a pull
- * request of the repository the viewer was opened in) and a number. Null when it names nothing.
- */
 export function parsePullRequestTarget(arg: string) {
   const input = arg.trim();
   const bare = BARE_NUMBER.exec(input);
@@ -46,7 +41,6 @@ export function parsePullRequestTarget(arg: string) {
 
 const RepoViewSchema = z.object({ nameWithOwner: z.string() });
 
-/** Resolves what the user typed to a pull request, reading a bare number's repository from `cwd`. */
 export async function resolvePullRequestTarget(arg: string, cwd: string): Promise<PullRequestRef> {
   const target = parsePullRequestTarget(arg);
   if (target === null) throw new Error(`"${arg.trim()}" is not a pull request. ${USAGE}`);

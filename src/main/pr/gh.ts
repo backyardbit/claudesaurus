@@ -1,25 +1,20 @@
 import { spawn } from "node:child_process";
 import type { z } from "zod";
 
-/** Most JSON a read may produce. An activity read of a long conversation runs to a few MB. */
 const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 60_000;
-/** Enough of stderr to explain a failure; the rest is gh repeating itself. */
 const STDERR_LIMIT = 64 * 1024;
 const MESSAGE_LIMIT = 300;
 
 export type GhOptions = {
   cwd: string;
-  /** Written to gh's stdin, which is how anything the user typed reaches GitHub: never argv. */
   stdin?: string;
-  /** Past this much stdout gh is stopped and the output comes back with `truncated` set. */
   maxBytes?: number;
   timeoutMs?: number;
 };
 
 export type GhOutput = { stdout: Buffer; truncated: boolean };
 
-/** A JSON value as a GraphQL variable can hold it. */
 export type GraphQlValue =
   | string
   | number
@@ -37,11 +32,6 @@ const SIGNED_OUT =
 const RATE_LIMITED =
   "GitHub's API rate limit is used up. Try again later; `gh api rate_limit` says when it resets.";
 
-/**
- * Turns what gh printed on a failure into a sentence for a toast. Being signed out and running
- * out of quota are said the same way whichever request hit them, since the fix is the same; any
- * other failure passes on gh's own words, which name the field or status GitHub refused.
- */
 export function ghFailureMessage(stderr: string, exitCode: number | null) {
   const lower = stderr.toLowerCase();
   if (
@@ -74,7 +64,6 @@ function ghEnv() {
   };
 }
 
-/** Runs gh without a shell, so no argument is ever parsed as anything but itself. */
 export function runGh(args: string[], options: GhOptions) {
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   return new Promise<GhOutput>((resolve, reject) => {
@@ -126,13 +115,11 @@ export function runGh(args: string[], options: GhOptions) {
         resolve({ stdout: Buffer.concat(chunks), truncated: false });
       }
     });
-    // gh may exit before reading its input, which would otherwise surface as an EPIPE crash.
     child.stdin.on("error", () => {});
     child.stdin.end(options.stdin ?? "");
   });
 }
 
-/** Parses gh's JSON output against what this module expects of it, naming the read that failed. */
 export function decodeJson<S extends z.ZodType>(schema: S, text: string, what: string) {
   let result: z.ZodSafeParseResult<z.output<S>>;
   try {
@@ -148,7 +135,6 @@ export function decodeJson<S extends z.ZodType>(schema: S, text: string, what: s
   return result.data;
 }
 
-/** A REST read whose JSON answer is checked against `schema`. */
 export async function ghJson<S extends z.ZodType>(
   cwd: string,
   args: string[],
@@ -160,10 +146,6 @@ export async function ghJson<S extends z.ZodType>(
   return decodeJson(schema, output.stdout.toString("utf8"), what);
 }
 
-/**
- * A GraphQL request. The document and its variables travel together over stdin: a variable can
- * hold words the user wrote, and argv shows up in process listings and in failure messages.
- */
 export async function graphql<S extends z.ZodType>(
   cwd: string,
   query: string,
@@ -179,7 +161,6 @@ export async function graphql<S extends z.ZodType>(
   return decodeJson(schema, output.stdout.toString("utf8"), what);
 }
 
-/** A GraphQL mutation. gh exits non-zero on a GraphQL error, so success needs no reading. */
 export async function graphqlWrite(cwd: string, query: string, variables: GraphQlVariables) {
   await runGh(["api", "graphql", "--input", "-"], {
     cwd,

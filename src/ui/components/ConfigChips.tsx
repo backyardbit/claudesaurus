@@ -13,10 +13,6 @@ import { useActions } from "../store";
 import { EffortChip } from "./EffortChip";
 import { Popover } from "./Popover";
 
-/**
- * The adapter lists the two states of an on/off setting in no fixed order (fast mode is off/on,
- * ultracode on/off), so every such setting is shown as Off, then On.
- */
 export function settingChoices(option: SessionConfigOption) {
   const listed = choices(option);
   const off = listed.find((choice) => choice.value === "off");
@@ -30,7 +26,6 @@ function currentName(option: SessionConfigOption) {
   return current?.name ?? option.currentValue;
 }
 
-/** The icon on a setting's chip, by its ACP category. */
 function chipIcon(category: SessionConfigOption["category"]): LucideIcon | undefined {
   switch (category) {
     case "model":
@@ -42,15 +37,12 @@ function chipIcon(category: SessionConfigOption["category"]): LucideIcon | undef
   }
 }
 
-/** The options that get their own chip inside the composer bar, by ACP category, in display order. */
 const BAR_CATEGORIES = ["thought_level", "mode"];
 
-/** Model pickers live on the shelf above the composer rather than inside the prompt bar. */
 export function modelOptions(options: SessionConfigOption[]) {
   return options.filter((option) => option.category === "model" && option.type === "select");
 }
 
-/** Splits the non-model options into composer-bar chips and the overflow settings popover. */
 export function barConfigOptions(options: SessionConfigOption[]) {
   const models = new Set(modelOptions(options));
   const primary = BAR_CATEGORIES.flatMap((category) =>

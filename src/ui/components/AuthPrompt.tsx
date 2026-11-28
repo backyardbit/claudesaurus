@@ -2,7 +2,6 @@ import { Copy, KeyRound, RotateCw } from "lucide-react";
 import type { AuthRequest } from "../../shared/protocol";
 import { useActions } from "../store";
 
-/** The agent's ways to sign in, offered when it needs that before a session can open. */
 export function AuthPrompt({ agentName, auth }: { agentName: string; auth: AuthRequest }) {
   const actions = useActions();
   return (

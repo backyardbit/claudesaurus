@@ -4,7 +4,6 @@ import { PullRequestDetailPanel } from "./components/pullRequest/PullRequestDeta
 import { AnchoredToastProvider, ToastProvider } from "./components/ui/toast";
 import { prBridge } from "./lib/prApi";
 
-/** One pull request, filling the pane, as T3 Code shows the one picked from its list. */
 export function App({ context }: { context: PrContext }) {
   const { reference } = context;
   useEffect(() => {
