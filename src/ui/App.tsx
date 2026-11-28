@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { AuthPrompt } from "./components/AuthPrompt";
 import { Celebration } from "./components/Celebration";
 import { Composer } from "./components/Composer";
+import { StandingDinosaur } from "./components/Dinosaur";
 import { PlanPill } from "./components/PlanPill";
 import { Timeline } from "./components/Timeline";
 import { Working } from "./components/Working";
@@ -20,7 +21,7 @@ function Welcome() {
   const detail = useAppState((state) => state.connectingDetail);
   return (
     <div className="welcome">
-      <div className="welcome-mark">🦕</div>
+      <StandingDinosaur />
       <h1>Claudesaurus</h1>
       {session && <p className="mono dim">{shortPath(session.cwd)}</p>}
       {account && <p className="dim">{account.label}</p>}
