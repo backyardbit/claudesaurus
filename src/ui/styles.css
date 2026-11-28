@@ -863,9 +863,10 @@ kbd {
   padding-bottom: 4rem;
 }
 
-.welcome-mark {
-  font-size: 3rem;
-  line-height: 1;
+.standing-dino {
+  display: block;
+  width: 6rem;
+  margin: 0 auto;
 }
 
 .welcome h1 {

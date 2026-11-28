@@ -256,6 +256,28 @@ export function Rex({ pose, hat }: { pose: RexPose; hat: ReactNode }) {
   );
 }
 
+const STANDING: RexPose = {
+  farLeg: "",
+  nearLeg: "",
+  torso: "",
+  tail: "",
+  head: "",
+  jaw: "",
+  arm: "",
+  eyeWhite: "2.10",
+  pupil: "1.15",
+  blink: false,
+  dust: [],
+};
+
+export function StandingDinosaur() {
+  return (
+    <svg className="dino standing-dino" viewBox="1 1 59 39" aria-hidden="true">
+      <Rex pose={STANDING} hat={null} />
+    </svg>
+  );
+}
+
 export function Dinosaur({ seconds }: { seconds: number }) {
   const id = `dino${useId().replace(/:/g, "")}`;
   const top = `${id}-top`;
